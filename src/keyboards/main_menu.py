@@ -4,3 +4,32 @@
 Модуль предназначен для клавиатуры главного экрана бота: перехода в каталог,
 профиль, оплату, бронирование и другие базовые пользовательские разделы.
 """
+
+from telegram import ReplyKeyboardMarkup
+
+MAIN_MENU_BUTTONS = [
+    ["Кнопка 1", "Кнопка 2"],
+    ["Кнопка 3", "Кнопка 4"]
+]
+
+# билд inline-кнопок
+def build_main_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        MAIN_MENU_BUTTONS,
+        resize_keyboard=True,
+        input_field_placeholder="main menu"
+    )
+
+# Получить список кнопок
+def get_menu_items() -> list[str]:
+    output = []
+    for buttons in MAIN_MENU_BUTTONS:
+        output.extend(buttons)
+
+    return output
+
+# Текст нажатия кнопки
+def get_button_text(button) -> str:
+    return f"Кнопка {button} нажата"
+
+

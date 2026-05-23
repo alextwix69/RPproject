@@ -20,16 +20,6 @@ def build_main_menu() -> ReplyKeyboardMarkup:
         input_field_placeholder="main menu"
     )
 
-# Получить список кнопок
-def get_menu_items() -> list[str]:
-    output = []
-    for buttons in MAIN_MENU_BUTTONS:
-        output.extend(buttons)
 
-    return output
-
-# Текст нажатия кнопки
-def get_button_text(button) -> str:
-    return f"Кнопка {button} нажата"
 
 

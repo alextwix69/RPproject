@@ -8,13 +8,18 @@
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-env_path = Path("../../.env")
-load_dotenv(dotenv_path=env_path)
-API_KEY = os.environ.get("API_KEY")
 
-if not API_KEY:
-    raise RuntimeError("API_KEY не получен")
+env_path = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=env_path)
+
+# Функция получения API-ключа, используется в bot.py
+def get_api_key() -> str:
+    api_key = os.environ.get("API_KEY")
+    if not api_key:
+        raise RuntimeError("API_KEY не получен")
+    return api_key
 
 

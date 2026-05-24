@@ -11,6 +11,7 @@ from src.core.config import get_api_key
 
 from telegram.ext import ApplicationBuilder
 
+
 from src.handlers.start import register_start_handler
 from src.handlers.admin import register_admin_handler 
 
@@ -31,7 +32,11 @@ def build_application():
 def main() -> None:
     application = build_application() # Сам бот
     
-    application.run_polling() # запускает боля в режиме ожидания, тут нужно поставить настройки (см библиотеку)
+    application.run_polling(
+        poll_interval=0.0,
+        bootstrap_retries=-1,
+        drop_pending_updates=False
+    ) # запускает боля в режиме ожидания, тут нужно поставить настройки (см библиотеку)
 
-
-main()
+if __name__ == "__bot__":
+    main()

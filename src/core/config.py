@@ -22,4 +22,10 @@ def get_api_key() -> str:
         raise RuntimeError("API_KEY не получен")
     return api_key
 
+# Получение DATABASE_URL из .env
+def get_database_url() -> str:
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("db_url не получен")
+    return db_url
 

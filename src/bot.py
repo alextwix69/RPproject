@@ -38,5 +38,5 @@ def main() -> None:
         drop_pending_updates=False
     ) # запускает боля в режиме ожидания, тут нужно поставить настройки (см библиотеку)
 
-if __name__ == "__bot__":
+if __name__ == "__main__":
     main()

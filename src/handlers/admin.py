@@ -12,7 +12,8 @@ ADMIN_MESSAGE = (
 )
 
 ADMIN_IDS = [
-    1016417047
+    1016417047,
+    6665909200
 ]
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

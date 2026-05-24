@@ -7,9 +7,11 @@ handlers, callbacks, middlewares, конфигурация и инфрастру
 от выбранной схемы развёртывания.
 """
 
-from core.config import get_api_key
+from src.core.config import get_api_key
 
 from telegram.ext import ApplicationBuilder
+
+from src.handlers.start import register_start_handler
 
 # Создание приложения бота
 def build_application():
@@ -19,9 +21,7 @@ def build_application():
     if application == None:
         raise RuntimeError("Ошибка билда приложения")
     
-    """
-        тут должно быть подключение хендлеров
-    """
+    register_start_handler(application)
 
     return application
 
@@ -31,3 +31,5 @@ def main() -> None:
     
     application.run_polling() # запускает боля в режиме ожидания, тут нужно поставить настройки (см библиотеку)
 
+
+main()

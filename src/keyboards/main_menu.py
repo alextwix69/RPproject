@@ -6,6 +6,7 @@
 """
 
 from telegram import ReplyKeyboardMarkup
+from src.core.logger import logger
 
 MAIN_MENU_BUTTONS = [
     ["Кнопка 1", "Кнопка 2"],
@@ -14,6 +15,8 @@ MAIN_MENU_BUTTONS = [
 
 # билд inline-кнопок
 def build_main_menu() -> ReplyKeyboardMarkup:
+    logger.info("build_main_menu")
+    
     return ReplyKeyboardMarkup(
         MAIN_MENU_BUTTONS,
         resize_keyboard=True,

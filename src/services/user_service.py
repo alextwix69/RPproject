@@ -22,6 +22,11 @@ def get_menu_items() -> list[str]:
 # Текст нажатия кнопки
 def get_button_text(button) -> str:
     logger.info(f"get_button_text({button})")
+
+    buttons = get_menu_items()
+    if button < 0 or button >= len(buttons):
+        logger.error(f"invalid argument ({button})")
+        raise ValueError(f"invalid argument ({button})")
     
-    return f"Кнопка {button} нажата"
+    return buttons[button]
 

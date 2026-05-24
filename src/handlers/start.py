@@ -13,7 +13,7 @@ from telegram.ext import (
     ContextTypes
 )
 
-from src.keyboards.main_menu import build_main_menu
+from src.keyboards.kb_build import build_main_menu
 
 START_MESSAGE = (
     "Добро пожаловать в RoleHub!\n"
@@ -31,3 +31,4 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # связь вызова /start и функции start()
 def register_start_handler(application) -> None:
     application.add_handler(CommandHandler("start", start))
+

@@ -12,6 +12,7 @@ from src.core.config import get_api_key
 from telegram.ext import ApplicationBuilder
 
 from src.handlers.start import register_start_handler
+from src.handlers.admin import register_admin_handler 
 
 # Создание приложения бота
 def build_application():
@@ -22,6 +23,7 @@ def build_application():
         raise RuntimeError("Ошибка билда приложения")
     
     register_start_handler(application)
+    register_admin_handler(application)
 
     return application
 

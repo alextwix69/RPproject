@@ -6,7 +6,7 @@
 handlers.
 """
 
-from src.keyboards.main_menu import MAIN_MENU_BUTTONS
+from src.keyboards.inline_buttons import MAIN_MENU_BUTTONS
 from src.core.logger import logger
 
 # Получить список кнопок

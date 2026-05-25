@@ -30,4 +30,9 @@ def get_database_url() -> str:
     return db_url
 
 def get_admin_ids() -> list[int]:
-    return os.environ.get("ADMIN_IDS")
+    admin_ids = [
+        int(x)
+        for x in os.getenv("ADMIN_IDS", "").split(",")
+        if x
+    ]
+    return admin_ids

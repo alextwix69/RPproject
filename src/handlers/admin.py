@@ -7,10 +7,10 @@ from telegram.ext import (
 
 from src.keyboards.kb_build import build_admin_panel
 from src.core.config import get_admin_ids
+
 ADMIN_MESSAGE = (
     "Это admin-панель\n"
 )
-
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("admin()")

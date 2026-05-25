@@ -15,3 +15,9 @@ ADMIN_PANEL_BUTTONS = [
     ["admin1"],
     ["admin2", "admin3"]
 ]
+
+CHOOSE_THEME_BUTTONS = [
+    ["brawl stars"],
+    ["my little pony"],
+    ["roblox"]
+]

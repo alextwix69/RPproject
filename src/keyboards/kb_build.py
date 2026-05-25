@@ -16,7 +16,7 @@ def build_main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         inline_buttons.MAIN_MENU_BUTTONS,
         resize_keyboard=True,
-        input_field_placeholder="main menu"
+        input_field_placeholder="welcome to RoleHub!"
     )
 
 def build_admin_panel() -> ReplyKeyboardMarkup:
@@ -25,8 +25,17 @@ def build_admin_panel() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         inline_buttons.ADMIN_PANEL_BUTTONS,
         resize_keyboard=True,
-        input_field_placeholder="main menu"
+        input_field_placeholder="ты просто босс, ты просто начальник"
     )
 
+
+def build_choose_theme() -> ReplyKeyboardMarkup:
+    logger.info("build_choose_theme")
+
+    return ReplyKeyboardMarkup(
+        inline_buttons.CHOOSE_THEME_BUTTONS,
+        resize_keyboard=True,
+        input_field_placeholder="кем ты станешь сегодня?"
+    )
 
 

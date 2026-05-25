@@ -1,28 +1,53 @@
 """
 ORM-модель пользователя Telegram.
 
-Здесь обычно хранятся telegram_id, имя, роль, регистрационные данные,
-timestamps и другая информация, которая нужна для сценариев профиля,
-регистрации и прав доступа.
+Модель описывает таблицу users в базе данных. В ней хранятся Telegram-данные
+пользователя, роль, статус регистрации и временные метки появления/обновления.
 """
 
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String
-from datetime import date
+from datetime import datetime
 
-class Base(DeclarativeBase):
-    pass
+from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.models.base import Base
+
 
 class User(Base):
-    __name__ = "users"
+    """Пользователь Telegram внутри приложения."""
 
-    id : Mapped[int] = mapped_column(
-        primary_key=True, 
-        unique=True, 
-        index=True
+    __tablename__ = "users"
+
+    # Внутренний ID записи в базе данных.
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # Telegram ID пользователя.
+    # unique=True запрещает дубли, index=True ускоряет поиск по telegram_id.
+    telegram_id: Mapped[int] = mapped_column(unique=True, index=True)
+
+    # Данные, которые приходят из Telegram effective_user.
+    # Они могут отсутствовать, поэтому ставим nullable=True.
+    username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    language_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    # Служебные поля приложения.
+    # role нужен для прав доступа, is_registered показывает прохождение регистрации.
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
+    role: Mapped[str] = mapped_column(String(50), default="user")
+    # Показывает, прошел ли пользователь регистрацию в боте.
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Время первого и последнего появления пользователя в боте.
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # created_at ставится при создании записи.
+    # updated_at обновляется при изменении записи благодаря onupdate.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
     )
-    
-    username : Mapped[str] = mapped_column(String(255))
-    created_at : Mapped[date] = mapped_column(date)
-
-

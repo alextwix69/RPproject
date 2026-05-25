@@ -29,3 +29,5 @@ def get_database_url() -> str:
         raise RuntimeError("db_url не получен")
     return db_url
 
+def get_admin_ids() -> list[int]:
+    return os.environ.get("ADMIN_IDS")

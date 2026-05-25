@@ -6,21 +6,17 @@ from telegram.ext import (
 )
 
 from src.keyboards.kb_build import build_admin_panel
-
+from src.core.config import get_admin_ids
 ADMIN_MESSAGE = (
     "Это admin-панель\n"
 )
 
-ADMIN_IDS = [
-    1016417047,
-    6665909200
-]
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("admin()")
 
     
-    if update.effective_user.id not in ADMIN_IDS:
+    if update.effective_user.id not in get_admin_ids():
         return
     
 

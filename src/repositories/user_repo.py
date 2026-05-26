@@ -11,13 +11,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.models.user import User
-
+from src.core.logger import logger
 
 def get_by_telegram_id(session: Session, telegram_id: int) -> User | None:
     """Ищет пользователя в базе по Telegram ID."""
 
+    logger.info("get_by_telegram_id : вход")
+
     # Собираем SQL-запрос: SELECT users WHERE telegram_id = ...
     stmt = select(User).where(User.telegram_id == telegram_id)
+    logger.info("get_by_telegram_id : select вызван")
 
     # session.scalar вернет одного пользователя или None, если пользователь не найден.
     return session.scalar(stmt)
@@ -63,21 +66,3 @@ def update_from_effective_user(user: User, effective_user) -> User:
     # Важно: is_registered здесь не меняем.
     # Регистрация в боте — отдельная логика, она не должна сбрасываться.
     return user
-
-
-def ensure_from_effective_user(session: Session, effective_user) -> User | None:
-    """Создает пользователя, если его нет, или обновляет, если он уже есть."""
-
-    # Иногда update может прийти без Telegram-пользователя.
-    if effective_user is None:
-        return None
-
-    # Ищем пользователя по Telegram ID.
-    user = get_by_telegram_id(session, effective_user.id)
-
-    # Если пользователя еще нет в базе — создаем.
-    if user is None:
-        return create_from_effective_user(session, effective_user)
-
-    # Если пользователь уже есть — обновляем Telegram-данные.
-    return update_from_effective_user(user, effective_user)

@@ -6,27 +6,37 @@
 handlers.
 """
 
-from src.keyboards.inline_buttons import MAIN_MENU_BUTTONS
 from src.core.logger import logger
+from src.models.user import User
 
-# Получить список кнопок
-def get_menu_items() -> list[str]:
-    logger.info("get_menu_items")
+from src.repositories.user_repo import (
+    create_from_effective_user,
+    get_by_telegram_id,
+    update_from_effective_user
+)
 
-    output = []
-    for buttons in MAIN_MENU_BUTTONS:
-        output.extend(buttons)
+def ensure_from_effective_user(session, effective_user) -> User | None:
+    """Создает пользователя, если его нет, или обновляет, если он уже есть."""
+    logger.info("ensure_from_effective_user : start")
 
-    return output
+    # Иногда update может прийти без Telegram-пользователя.
+    if effective_user is None:
+        return None
 
-# Текст нажатия кнопки
-def get_button_text(button) -> str:
-    logger.info(f"get_button_text({button})")
-
-    buttons = get_menu_items()
-    if button < 0 or button >= len(buttons):
-        logger.error(f"invalid argument ({button})")
-        raise ValueError(f"invalid argument ({button})")
+    logger.info("ensure_from_effective_user : eu is NOT NONE")
     
-    return buttons[button]
+    # Ищем пользователя по Telegram ID.
+    user = get_by_telegram_id(session, effective_user.id)
+    logger.info("ensure_from_effective_user : get_by_telegram_id : end")
 
+    # Если пользователя еще нет в базе — создаем.
+    if user is None:
+        return create_from_effective_user(session, effective_user)
+    logger.info("ensure_from_effective_user : user is NOT NONE")
+    
+    # Если пользователь уже есть — обновляем Telegram-данные.
+    return update_from_effective_user(user, effective_user)
+
+
+
+    

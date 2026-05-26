@@ -6,6 +6,8 @@
 соединения вручную в бизнес-логике или handlers.
 """
 
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.core.config import get_database_url
@@ -15,9 +17,11 @@ from src.models.base import Base
 db_url = get_database_url()
 engine = create_engine(db_url)
 
+# работа с локальной сессией
 SessionLocal = sessionmaker(bind=engine)
 
 # Функция передачи сессии
+@contextmanager
 def get_session():
     logger.info("get_session вызвана")
     with SessionLocal() as session:

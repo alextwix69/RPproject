@@ -5,8 +5,9 @@ from sqlalchemy.orm import sessionmaker
 
 from src.models.base import Base
 from src.models.user import User
-from src.repositories.user_repo import ensure_from_effective_user
+from src.services.user_service import ensure_from_effective_user
 
+from src.repositories.user_repo import get_by_telegram_id 
 
 def make_effective_user(
     telegram_id: int = 100,
@@ -117,4 +118,20 @@ def test_is_registered_does_not_reset_on_update():
     assert updated_user.is_registered is True
     assert updated_user.username == "new_username"
 
-    session
+    session.close()
+
+def test_get_by_telegram_id_type():
+    session = make_session()
+    effective_user = make_effective_user(telegram_id=1016417047)
+
+    created_user = ensure_from_effective_user(session, effective_user)
+    session.commit()
+
+    found_user = get_by_telegram_id(session, effective_user.id)
+    missing_user = get_by_telegram_id(session, 404)
+
+    assert isinstance(found_user, User)
+    assert found_user.id == created_user.id
+    assert missing_user is None
+
+    session.close()

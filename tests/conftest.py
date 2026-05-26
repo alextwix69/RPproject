@@ -4,6 +4,7 @@
 Здесь обычно создаются тестовый бот, тестовая база данных, mock-сервисы,
 event loop и другие объекты, которые нужны нескольким тестовым модулям.
 """
+import pytest
 
 from src.core.config import get_admin_ids
 

@@ -8,6 +8,7 @@ handlers, callbacks, middlewares, конфигурация и инфрастру
 """
 
 from src.core.config import get_api_key
+from src.core.database import create_db_tables
 
 from telegram.ext import ApplicationBuilder
 
@@ -17,6 +18,8 @@ from src.handlers.admin import register_admin_handler
 
 # Создание приложения бота
 def build_application():
+    create_db_tables()
+
     API_KEY = get_api_key()
     application = ApplicationBuilder().token(API_KEY).build()
 

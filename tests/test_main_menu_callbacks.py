@@ -1,3 +1,5 @@
+import pytest
+
 from src.callbacks.main_menu import (
     MAIN_MENU_RESPONSE_TEXTS,
     MainMenuIntent,

@@ -4,42 +4,30 @@ from enum import Enum
 class MainMenuIntent(str, Enum):
     """Понятные имена действий, которые может выбрать пользователь в главном меню."""
 
-    REGISTER = "REGISTER"
-    PROFILE = "PROFILE"
-    LOBBY = "LOBBY"
-    HELP = "HELP"
+    PLAY = "PLAY"
+    SHOP = "SHOP"
+    SETTINGS = "SETTINGS"
+    SUPPORT = "SUPPORT"
     UNKNOWN = "UNKNOWN"
 
 
 # Единый контракт callback-data главного меню.
 # Клавиатура должна отправлять эти строки, а handler будет получать готовый intent.
 _MAIN_MENU_CALLBACKS = {
-    "main:register": MainMenuIntent.REGISTER,
-    "main:profile": MainMenuIntent.PROFILE,
-    "main:lobby": MainMenuIntent.LOBBY,
-    "main:help": MainMenuIntent.HELP,
+    "main:play": MainMenuIntent.PLAY,
+    "main:shop": MainMenuIntent.SHOP,
+    "main:settings": MainMenuIntent.SETTINGS,
+    "main:support": MainMenuIntent.SUPPORT,
 }
 
 
 # Тексты держим рядом с router'ом, пока проект маленький.
 # Так handler сможет просто выбрать intent и взять готовый ответ.
 MAIN_MENU_RESPONSE_TEXTS = {
-    MainMenuIntent.REGISTER: (
-        "Регистрация скоро стартует. "
-        "Это будет первый шаг входа в RoleHub-лобби."
-    ),
-    MainMenuIntent.PROFILE: (
-        "Профиль пока не заполнен. "
-        "После регистрации здесь появятся данные участника."
-    ),
-    MainMenuIntent.LOBBY: (
-        "Лобби готовится. "
-        "Скоро здесь будет список доступных RP-комнат."
-    ),
-    MainMenuIntent.HELP: (
-        "RoleHub помогает найти RP-лобби и подготовить профиль участника. "
-        "Сейчас доступны базовые разделы: регистрация, профиль, лобби и помощь."
-    ),
+    MainMenuIntent.PLAY: "Выбери тему для игры:",
+    MainMenuIntent.SHOP: "Тут будет магазин.",
+    MainMenuIntent.SETTINGS: "Тут будут настройки.",
+    MainMenuIntent.SUPPORT: "Тут будет поддержка.",
     MainMenuIntent.UNKNOWN: (
         "Неизвестная кнопка. Вернись в главное меню и выбери раздел ещё раз."
     ),

@@ -11,10 +11,10 @@ from src.callbacks.main_menu import (
 def test_known_main_menu_callbacks_return_expected_intents():
     """Каждый известный callback главного меню возвращает свой intent."""
 
-    assert resolve_main_menu_callback("main:register") == MainMenuIntent.REGISTER
-    assert resolve_main_menu_callback("main:profile") == MainMenuIntent.PROFILE
-    assert resolve_main_menu_callback("main:lobby") == MainMenuIntent.LOBBY
-    assert resolve_main_menu_callback("main:help") == MainMenuIntent.HELP
+    assert resolve_main_menu_callback("main:play") == MainMenuIntent.PLAY
+    assert resolve_main_menu_callback("main:shop") == MainMenuIntent.SHOP
+    assert resolve_main_menu_callback("main:settings") == MainMenuIntent.SETTINGS
+    assert resolve_main_menu_callback("main:support") == MainMenuIntent.SUPPORT
 
 
 def test_unknown_main_menu_callback_returns_unknown():

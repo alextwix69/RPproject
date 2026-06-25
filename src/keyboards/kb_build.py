@@ -1,41 +1,36 @@
-"""
-Основное меню пользователя.
+"""Сборка inline-меню бота."""
 
-Модуль предназначен для клавиатуры главного экрана бота: перехода в каталог,
-профиль, оплату, бронирование и другие базовые пользовательские разделы.
-"""
-
-from telegram import ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src.core.logger import logger
 import src.keyboards.inline_buttons as inline_buttons
 
-# билд inline-кнопок
-def build_main_menu() -> ReplyKeyboardMarkup:
+
+def _build_inline_keyboard(button_rows) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(text=text, callback_data=callback_data)
+                for text, callback_data in row
+            ]
+            for row in button_rows
+        ]
+    )
+
+
+def build_main_menu() -> InlineKeyboardMarkup:
     logger.info("build_main_menu")
 
-    return ReplyKeyboardMarkup(
-        inline_buttons.MAIN_MENU_BUTTONS,
-        resize_keyboard=True,
-        input_field_placeholder="welcome to RoleHub!"
-    )
+    return _build_inline_keyboard(inline_buttons.MAIN_MENU_BUTTONS)
 
-def build_admin_panel() -> ReplyKeyboardMarkup:
+
+def build_admin_panel() -> InlineKeyboardMarkup:
     logger.info("build_admin_panel")
 
-    return ReplyKeyboardMarkup(
-        inline_buttons.ADMIN_PANEL_BUTTONS,
-        resize_keyboard=True,
-        input_field_placeholder="ты просто босс, ты просто начальник"
-    )
+    return _build_inline_keyboard(inline_buttons.ADMIN_PANEL_BUTTONS)
 
 
-def build_choose_theme() -> ReplyKeyboardMarkup:
+def build_choose_theme() -> InlineKeyboardMarkup:
     logger.info("build_choose_theme")
 
-    return ReplyKeyboardMarkup(
-        inline_buttons.CHOOSE_THEME_BUTTONS,
-        resize_keyboard=True,
-        input_field_placeholder="кем ты станешь сегодня?"
-    )
-
+    return _build_inline_keyboard(inline_buttons.CHOOSE_THEME_BUTTONS)
 

@@ -7,7 +7,7 @@
 """
 
 from src.core.logger import logger
-from telegram import Update
+from telegram import ReplyKeyboardRemove, Update
 from telegram.ext import (
     CommandHandler,
     ContextTypes
@@ -37,8 +37,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             raise
         
 
+    if update.message is None:
+        return
+
     await update.message.reply_text(
         START_MESSAGE,
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+    await update.message.reply_text(
+        "Главное меню:",
         reply_markup=build_main_menu()
     )
 

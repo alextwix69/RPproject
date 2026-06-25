@@ -15,6 +15,7 @@ from telegram.ext import ApplicationBuilder
 
 from src.handlers.start import register_start_handler
 from src.handlers.admin import register_admin_handler 
+from src.handlers.main_menu import register_main_menu_handler
 
 # Создание приложения бота
 def build_application():
@@ -28,6 +29,7 @@ def build_application():
     
     register_start_handler(application)
     register_admin_handler(application)
+    register_main_menu_handler(application)
 
     return application
 

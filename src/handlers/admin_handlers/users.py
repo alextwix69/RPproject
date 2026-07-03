@@ -41,7 +41,7 @@ def _format_datetime(value: datetime | None) -> str:
     if value is None:
         return "-"
 
-    return value.strftime("%d.%m.%Y %H:%M")
+    return value.strftime("%d.%m.%Y %H:%M:%S")
 
 
 def _format_username(user: User) -> str:
@@ -51,13 +51,29 @@ def _format_username(user: User) -> str:
     return "-"
 
 
+def _format_full_name(user: User) -> str:
+    full_name = " ".join(
+        part
+        for part in (user.first_name, user.last_name)
+        if part
+    ).strip()
+
+    return full_name or "-"
+
+
+def _format_display_name(user: User) -> str:
+    if user.username:
+        return f"@{user.username}"
+
+    return _format_full_name(user)
+
+
 def _format_user_short(user: User, number: int) -> str:
     return (
-        f"{number}. {_format_username(user)}\n"
+        f"{number}. {_format_display_name(user)}\n"
         f"TG ID: {user.telegram_id}\n"
-        f"Имя: {user.first_name or '-'} {user.last_name or ''}\n"
+        f"Имя: {_format_full_name(user)}\n"
         f"Язык: {user.language_code or '-'}\n"
-        f"Регистрация: {'да' if user.is_registered else 'нет'}\n"
         f"Первый вход: {_format_datetime(user.first_seen_at)}\n"
         f"Последний вход: {_format_datetime(user.last_seen_at)}"
     )
@@ -68,17 +84,16 @@ def _format_user_full(user: User) -> str:
         "Пользователь\n\n"
         f"DB ID: {user.id}\n"
         f"TG ID: {user.telegram_id}\n"
+        f"Отображение: {_format_display_name(user)}\n"
         f"Username: {_format_username(user)}\n"
-        f"First name: {user.first_name or '-'}\n"
-        f"Last name: {user.last_name or '-'}\n"
-        f"Language: {user.language_code or '-'}\n"
-        f"Bot: {'да' if user.is_bot else 'нет'}\n"
-        f"Role: {user.role}\n"
-        f"Registered: {'да' if user.is_registered else 'нет'}\n"
-        f"First seen: {_format_datetime(user.first_seen_at)}\n"
-        f"Last seen: {_format_datetime(user.last_seen_at)}\n"
-        f"Created: {_format_datetime(user.created_at)}\n"
-        f"Updated: {_format_datetime(user.updated_at)}"
+        f"Имя: {_format_full_name(user)}\n"
+        f"Язык: {user.language_code or '-'}\n"
+        f"Бот: {'да' if user.is_bot else 'нет'}\n"
+        f"Роль: {user.role}\n"
+        f"Первый вход: {_format_datetime(user.first_seen_at)}\n"
+        f"Последний вход: {_format_datetime(user.last_seen_at)}\n"
+        f"Создан: {_format_datetime(user.created_at)}\n"
+        f"Обновлен: {_format_datetime(user.updated_at)}"
     )
 
 
@@ -100,9 +115,7 @@ def _stats_text() -> str:
 
     return (
         "Статистика пользователей\n\n"
-        f"Всего: {stats['total']}\n"
-        f"Зарегистрированы: {stats['registered']}\n"
-        f"Не зарегистрированы: {stats['not_registered']}\n"
+        f"Всего в базе: {stats['total']}\n"
         f"Боты: {stats['bots']}\n"
         f"Активны сегодня: {stats['active_today']}\n"
         f"Активны за 7 дней: {stats['active_week']}"
@@ -119,13 +132,14 @@ def _users_csv_file() -> InputFile:
         [
             "db_id",
             "telegram_id",
+            "display_name",
             "username",
+            "full_name",
             "first_name",
             "last_name",
             "language_code",
             "is_bot",
             "role",
-            "is_registered",
             "first_seen_at",
             "last_seen_at",
             "created_at",
@@ -138,17 +152,18 @@ def _users_csv_file() -> InputFile:
             [
                 user.id,
                 user.telegram_id,
+                _format_display_name(user),
                 user.username,
+                _format_full_name(user),
                 user.first_name,
                 user.last_name,
                 user.language_code,
                 user.is_bot,
                 user.role,
-                user.is_registered,
-                user.first_seen_at,
-                user.last_seen_at,
-                user.created_at,
-                user.updated_at,
+                _format_datetime(user.first_seen_at),
+                _format_datetime(user.last_seen_at),
+                _format_datetime(user.created_at),
+                _format_datetime(user.updated_at),
             ]
         )
 

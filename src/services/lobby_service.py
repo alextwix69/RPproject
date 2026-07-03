@@ -28,10 +28,10 @@ def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
     if user.current_lobby_id is not None:
         raise LobbyError("already_in_lobby", "Ты уже находишься в лобби.")
 
-    if payload["mode"] == "rp":
-        _validate_rp_role(lobby=None, topic=payload["topic"], role=payload.get("role"))
-        if int(payload["max_players"]) > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
-            raise LobbyError("too_many_players", "Для этой темы недостаточно уникальных ролей.")
+    mode = "rp"
+    _validate_rp_role(lobby=None, topic=payload["topic"], role=payload.get("role"))
+    if int(payload["max_players"]) > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
+        raise LobbyError("too_many_players", "Для этой темы недостаточно уникальных ролей.")
 
     code = _generate_unique_code(session)
     now = datetime.utcnow()
@@ -39,7 +39,7 @@ def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
         session,
         code=code,
         topic=payload["topic"],
-        mode=payload["mode"],
+        mode=mode,
         owner_id=user.id,
         max_players=int(payload["max_players"]),
         players_count=1,

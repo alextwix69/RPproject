@@ -34,16 +34,6 @@ def get_topic_keyboard(prefix: str, back_callback: str = "play:main") -> InlineK
     )
 
 
-def get_create_mode_keyboard() -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("💬 Обычное общение", "create:mode:chat")],
-            [("🎭 Ролевая игра", "create:mode:rp")],
-            [("⬅️ Назад", "create:back:topic"), ("🏠 Меню", "menu:main")],
-        ]
-    )
-
-
 def get_create_role_keyboard(topic: str, page: int = 0) -> InlineKeyboardMarkup:
     roles = list(ROLES_BY_TOPIC.get(topic, {}).items())
     page_roles, page, pages_count = _paginate(roles, page)
@@ -53,12 +43,12 @@ def get_create_role_keyboard(topic: str, page: int = 0) -> InlineKeyboardMarkup:
         rows.append(nav)
     rows.append([("🔎 Найти роль", "create:role_search")])
     rows.append([("🎲 Случайная", "create:role:random")])
-    rows.append([("⬅️ Назад", "create:back:mode"), ("🏠 Меню", "menu:main")])
+    rows.append([("⬅️ Назад", "create:back:topic"), ("🏠 Меню", "menu:main")])
     return _build(rows)
 
 
 def get_create_size_keyboard(
-    back_callback: str = "create:back:role_or_mode",
+    back_callback: str = "create:back:role",
     max_size: int = 5,
 ) -> InlineKeyboardMarkup:
     sizes = [size for size in (2, 3, 4, 5) if size <= max_size]

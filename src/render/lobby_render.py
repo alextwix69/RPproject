@@ -4,7 +4,7 @@ from src.constants.roles import ROLES_BY_TOPIC
 from src.constants.topics import TOPICS
 from src.models.lobby import Lobby
 
-MODE_NAMES = {"chat": "Обычное общение", "rp": "Ролевая игра"}
+MODE_NAMES = {"rp": "Ролевая игра"}
 PRIVACY_NAMES = {"public": "Открытое", "private": "Приватное"}
 STATUS_NAMES = {"waiting": "ожидание игроков", "active": "активно", "closed": "закрыто"}
 
@@ -35,10 +35,6 @@ def render_create_topic() -> str:
     return "➕ Создание лобби\n\nВыбери тему:"
 
 
-def render_create_mode(topic: str) -> str:
-    return f"🎮 Тема: {topic_name(topic)}\n\nВыбери режим:"
-
-
 def render_create_role(topic: str) -> str:
     return f"🎭 Ролевая игра\n\nТема: {topic_name(topic)}\n\nВыбери роль:"
 
@@ -55,7 +51,6 @@ def render_create_confirm(state: dict) -> str:
     return (
         "✅ Проверь настройки лобби\n\n"
         f"Тема: {topic_name(state.get('topic'))}\n"
-        f"Режим: {mode_name(state.get('mode'))}\n"
         f"Роль: {role_name(state.get('topic'), state.get('role'))}\n"
         f"Игроков: {state.get('max_players')}\n"
         f"Тип: {privacy_name(state.get('privacy'))}\n\n"

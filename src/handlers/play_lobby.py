@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 
 from telegram import Update
-from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 
 from src.constants.callbacks import (
     PENDING_CREATE_ROLE_SEARCH,
@@ -21,7 +21,6 @@ from src.keyboards.lobby_keyboard import (
     get_already_in_lobby_keyboard,
     get_code_entry_keyboard,
     get_create_confirm_keyboard,
-    get_create_mode_keyboard,
     get_create_privacy_keyboard,
     get_create_role_keyboard,
     get_create_size_keyboard,
@@ -41,7 +40,6 @@ from src.keyboards.lobby_keyboard import (
 from src.render.lobby_render import (
     render_active_lobby_started,
     render_create_confirm,
-    render_create_mode,
     render_create_privacy,
     render_create_role,
     render_create_size,
@@ -112,20 +110,9 @@ async def handle_create_callback(update: Update, action: str, value: str, extra:
     if action == "topic" and value in TOPICS:
         with get_session() as session:
             user = _ensure_user(session, update)
-            set_create_state(session, user, {"topic": value})
+            set_create_state(session, user, {"topic": value, "mode": "rp", "role": None})
             session.commit()
-        await _render(update, render_create_mode(value), get_create_mode_keyboard())
-        return
-
-    if action == "mode" and value in {"chat", "rp"}:
-        with get_session() as session:
-            user = _ensure_user(session, update)
-            state = set_create_state(session, user, {"mode": value, "role": None})
-            session.commit()
-        if value == "rp":
-            await _render(update, render_create_role(state["topic"]), get_create_role_keyboard(state["topic"]))
-            return
-        await _render(update, render_create_size(), get_create_size_keyboard("create:back:mode"))
+        await _render(update, render_create_role(value), get_create_role_keyboard(value))
         return
 
     if action == "role":
@@ -137,6 +124,7 @@ async def handle_create_callback(update: Update, action: str, value: str, extra:
             state = set_create_state(session, user, {"role": role})
             clear_pending_action(user)
             session.commit()
+        await _answer_role_selected(update, topic, role, value == "random")
         max_size = len(ROLES_BY_TOPIC.get(topic or "", {})) if topic else 5
         await _render(update, render_create_size(), get_create_size_keyboard(max_size=max_size))
         return
@@ -176,7 +164,7 @@ async def handle_create_callback(update: Update, action: str, value: str, extra:
             user = _ensure_user(session, update)
             state = get_create_state(user)
             max_size = len(ROLES_BY_TOPIC.get(state.get("topic") or "", {}))
-            if state.get("mode") == "rp" and int(value) > max_size:
+            if int(value) > max_size:
                 session.commit()
                 await _render(
                     update,
@@ -208,9 +196,9 @@ async def handle_create_callback(update: Update, action: str, value: str, extra:
     if action == "from_find" and value in TOPICS:
         with get_session() as session:
             user = _ensure_user(session, update)
-            set_create_state(session, user, {"topic": value})
+            set_create_state(session, user, {"topic": value, "mode": "rp", "role": None})
             session.commit()
-        await _render(update, render_create_mode(value), get_create_mode_keyboard())
+        await _render(update, render_create_role(value), get_create_role_keyboard(value))
         return
 
     if action == "back":
@@ -468,6 +456,7 @@ async def _expiration_loop(application) -> None:
 
 
 def register_lobby_message_handler(application) -> None:
+    application.add_handler(CommandHandler("leave", leave_command))
     application.add_handler(
         MessageHandler(
             (filters.TEXT & ~filters.COMMAND) | filters.PHOTO | filters.Sticker.ALL | filters.VOICE,
@@ -477,6 +466,10 @@ def register_lobby_message_handler(application) -> None:
     job_queue = getattr(application, "_job_queue", None)
     if job_queue is not None:
         job_queue.run_repeating(close_expired_lobbies, interval=60, first=60)
+
+
+async def leave_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _leave_current_lobby_from_message(update)
 
 
 async def _show_create_topic(update: Update) -> None:
@@ -521,6 +514,7 @@ async def _confirm_create_lobby(update: Update, bot) -> None:
 
 
 async def _join_lobby_from_callback(update: Update, code: str, role: str | None = None) -> None:
+    was_random = role == "random"
     with get_session() as session:
         try:
             user = _ensure_user(session, update)
@@ -559,6 +553,7 @@ async def _join_lobby_from_callback(update: Update, code: str, role: str | None 
             await _render(update, "Не удалось войти в лобби.", get_play_main_keyboard())
             return
 
+    await _answer_role_selected(update, lobby.topic, role, was_random)
     await notify_user_joined(update.get_bot(), lobby.id, user.id)
     if auto_start:
         await notify_lobby_started(update.get_bot(), lobby.id)
@@ -587,6 +582,16 @@ async def _start_lobby_callback(update: Update, code: str) -> None:
 
 
 async def _leave_lobby_callback(update: Update, code: str | None) -> None:
+    await _leave_current_lobby(update, code)
+
+
+async def _leave_current_lobby_from_message(update: Update) -> None:
+    if update.message is None:
+        return
+    await _leave_current_lobby(update, None)
+
+
+async def _leave_current_lobby(update: Update, code: str | None) -> None:
     with get_session() as session:
         try:
             user = _ensure_user(session, update)
@@ -837,13 +842,8 @@ async def _handle_create_back(update: Update, value: str) -> None:
         state = get_create_state(user)
     if value == "topic":
         await _show_create_topic(update)
-    elif value == "mode":
-        await _render(update, render_create_mode(state.get("topic")), get_create_mode_keyboard())
-    elif value == "role_or_mode":
-        if state.get("mode") == "rp":
-            await _render(update, render_create_role(state.get("topic")), get_create_role_keyboard(state.get("topic")))
-        else:
-            await _render(update, render_create_mode(state.get("topic")), get_create_mode_keyboard())
+    elif value in {"role", "mode", "role_or_mode"}:
+        await _render(update, render_create_role(state.get("topic")), get_create_role_keyboard(state.get("topic")))
     elif value == "size":
         await _render(update, render_create_size(), get_create_size_keyboard())
     elif value == "privacy":
@@ -883,6 +883,29 @@ def _resolve_random_free_role(topic: str | None, taken_roles: set[str]) -> str |
     return random.choice(roles) if roles else None
 
 
+async def _answer_role_selected(
+    update: Update,
+    topic: str | None,
+    role: str | None,
+    was_random: bool = False,
+) -> None:
+    if not role:
+        return
+
+    text = (
+        f"🎲 Тебе досталась роль: {role_name(topic, role)}"
+        if was_random
+        else f"🎭 Ты выбрал роль: {role_name(topic, role)}"
+    )
+
+    if update.effective_chat is not None:
+        await update.get_bot().send_message(chat_id=update.effective_chat.id, text=text)
+        return
+
+    if update.message is not None:
+        await update.message.reply_text(text)
+
+
 def _safe_page(value: str) -> int:
     try:
         return max(0, int(value))
@@ -900,7 +923,8 @@ def _validate_lobby_joinable_for_role_selection(lobby) -> None:
 
 
 def _validate_create_state(state: dict) -> None:
-    required = {"topic", "mode", "max_players", "privacy"}
+    state.setdefault("mode", "rp")
+    required = {"topic", "max_players", "privacy"}
     if not required.issubset(state):
         raise LobbyError("invalid_state", "Настройки лобби неполные. Начни создание заново.")
 

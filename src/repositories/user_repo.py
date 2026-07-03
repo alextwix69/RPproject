@@ -5,9 +5,9 @@
 Репозиторий работает с ORM-моделью User и получает session снаружи.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.models.user import User
@@ -24,6 +24,63 @@ def get_by_telegram_id(session: Session, telegram_id: int) -> User | None:
 
     # session.scalar вернет одного пользователя или None, если пользователь не найден.
     return session.scalar(stmt)
+
+
+def list_users(session: Session, limit: int = 10, offset: int = 0) -> list[User]:
+    """Возвращает пользователей для админского просмотра."""
+
+    safe_limit = max(1, min(limit, 50))
+    safe_offset = max(0, offset)
+    stmt = (
+        select(User)
+        .order_by(User.last_seen_at.desc(), User.id.desc())
+        .limit(safe_limit)
+        .offset(safe_offset)
+    )
+
+    return list(session.scalars(stmt).all())
+
+
+def list_all_users(session: Session) -> list[User]:
+    """Возвращает всех пользователей для CSV-экспорта."""
+
+    stmt = select(User).order_by(User.id.asc())
+    return list(session.scalars(stmt).all())
+
+
+def get_users_stats(session: Session) -> dict[str, int]:
+    """Собирает базовую статистику пользователей."""
+
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = now - timedelta(days=7)
+
+    total = session.scalar(select(func.count(User.id))) or 0
+    registered = (
+        session.scalar(select(func.count(User.id)).where(User.is_registered.is_(True)))
+        or 0
+    )
+    bots = (
+        session.scalar(select(func.count(User.id)).where(User.is_bot.is_(True)))
+        or 0
+    )
+    active_today = (
+        session.scalar(select(func.count(User.id)).where(User.last_seen_at >= today_start))
+        or 0
+    )
+    active_week = (
+        session.scalar(select(func.count(User.id)).where(User.last_seen_at >= week_start))
+        or 0
+    )
+
+    return {
+        "total": total,
+        "registered": registered,
+        "not_registered": total - registered,
+        "bots": bots,
+        "active_today": active_today,
+        "active_week": active_week,
+    }
 
 
 def create_from_effective_user(session: Session, effective_user) -> User:

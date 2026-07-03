@@ -27,8 +27,8 @@ def build_admin_panel() -> InlineKeyboardMarkup:
 
     return _build_inline_keyboard(
         [
-            [("admin1", "admin:admin1")],
-            [("admin2", "admin:admin2"), ("admin3", "admin:admin3")],
+            [("Пользователи", "admin:users")],
+            [("Статистика", "admin:stats"), ("Экспорт CSV", "admin:export_users")],
         ]
     )
 

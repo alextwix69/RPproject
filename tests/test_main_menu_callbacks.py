@@ -7,6 +7,7 @@ from src.callbacks.main_menu import (
     resolve_main_menu_callback,
 )
 from src.keyboards.kb_build import (
+    build_admin_panel,
     getMainMenuKeyboard,
     getPlayTopicsKeyboard,
     getTopicActionsKeyboard,
@@ -82,4 +83,12 @@ def test_topic_actions_keyboard_has_back_and_menu_callbacks():
         "play:rooms:mlp",
         "play:back:topics",
         "menu:main",
+    ]
+
+
+def test_admin_panel_uses_expected_callbacks():
+    assert _callback_data(build_admin_panel()) == [
+        "admin:users",
+        "admin:stats",
+        "admin:export_users",
     ]

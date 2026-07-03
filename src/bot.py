@@ -16,13 +16,19 @@ from telegram.ext import ApplicationBuilder
 from src.handlers.start import register_start_handler
 from src.handlers.admin import register_admin_handler 
 from src.handlers.main_menu import register_main_menu_handler
+from src.handlers.play_lobby import register_lobby_message_handler, start_lobby_background_tasks
 
 # Создание приложения бота
 def build_application():
     create_db_tables()
 
     API_KEY = get_api_key()
-    application = ApplicationBuilder().token(API_KEY).build()
+    application = (
+        ApplicationBuilder()
+        .token(API_KEY)
+        .post_init(start_lobby_background_tasks)
+        .build()
+    )
 
     if application == None:
         raise RuntimeError("Ошибка билда приложения")
@@ -30,6 +36,7 @@ def build_application():
     register_start_handler(application)
     register_admin_handler(application)
     register_main_menu_handler(application)
+    register_lobby_message_handler(application)
 
     return application
 

@@ -25,6 +25,13 @@ from src.render.menu import (
     showSupportFaq,
     showTopicActions,
 )
+from src.handlers.play_lobby import (
+    handle_create_callback,
+    handle_find_callback,
+    handle_lobby_callback,
+    handle_play_callback as handle_lobby_play_callback,
+    handle_quick_callback,
+)
 from src.services.user_service import ensure_from_effective_user
 
 
@@ -49,7 +56,17 @@ async def callback_router(
     data = query.data or ""
     section, action, value, extra = (data.split(":") + ["", "", "", ""])[:4]
 
-    if section not in {"menu", "play", "shop", "settings", "support"}:
+    if section not in {
+        "menu",
+        "play",
+        "create",
+        "find",
+        "quick",
+        "lobby",
+        "shop",
+        "settings",
+        "support",
+    }:
         await query.answer("Действие недоступно")
         return
 
@@ -61,6 +78,22 @@ async def callback_router(
 
     if section == "play":
         await handlePlayCallback(update, action, value, extra)
+        return
+
+    if section == "create":
+        await handle_create_callback(update, action, value, extra)
+        return
+
+    if section == "find":
+        await handle_find_callback(update, action, value, extra)
+        return
+
+    if section == "quick":
+        await handle_quick_callback(update, action, value, extra)
+        return
+
+    if section == "lobby":
+        await handle_lobby_callback(update, action, value, extra)
         return
 
     if section == "shop":
@@ -101,6 +134,9 @@ async def handleMainMenuCallback(update: Update, action: str) -> None:
 
 
 async def handlePlayCallback(update: Update, action: str, value: str, extra: str) -> None:
+    if await handle_lobby_play_callback(update, action, value, extra):
+        return
+
     if action == "topic":
         if value not in TOPICS:
             await showPlayTopics(update)
@@ -306,7 +342,7 @@ def register_main_menu_handler(application) -> None:
     application.add_handler(
         CallbackQueryHandler(
             callback_router,
-            pattern=r"^(menu|play|shop|settings|support):",
+            pattern=r"^(menu|play|create|find|quick|lobby|shop|settings|support):",
         )
     )
     application.add_handler(CallbackQueryHandler(callback_router))

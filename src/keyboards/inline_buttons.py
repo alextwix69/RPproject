@@ -8,15 +8,13 @@ MENU_SHOP_CALLBACK = "menu:shop"
 MENU_SETTINGS_CALLBACK = "menu:settings"
 MENU_SUPPORT_CALLBACK = "menu:support"
 
-TOPICS = {
-    "brawl_stars": "Brawl Stars",
-    "mlp": "My Little Pony",
-    "roblox": "Roblox",
-}
+from src.constants.topics import TOPICS
 
 PLAY_ACTIONS = {
     "find": "Найти лобби",
     "create": "Создать лобби",
+    "quick": "Быстрый вход",
+    "code": "Войти по коду",
     "rooms": "Список комнат",
 }
 

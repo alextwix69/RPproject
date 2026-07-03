@@ -21,6 +21,8 @@ from src.keyboards.kb_build import (
     getSupportKeyboard,
     getTopicActionsKeyboard,
 )
+from src.keyboards.lobby_keyboard import get_play_main_keyboard
+from src.render.lobby_render import render_play_main
 
 
 MAIN_MENU_TEXT = "Добро пожаловать в RoleHub!\n\nГлавное меню:"
@@ -58,8 +60,8 @@ async def showMainMenu(update: Update) -> None:
 async def showPlayTopics(update: Update) -> None:
     await _render(
         update,
-        "🎮 Играть\n\nВыбери тему для игры:",
-        getPlayTopicsKeyboard(),
+        render_play_main(),
+        get_play_main_keyboard(),
     )
 
 

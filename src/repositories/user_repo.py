@@ -26,6 +26,11 @@ def get_by_telegram_id(session: Session, telegram_id: int) -> User | None:
     return session.scalar(stmt)
 
 
+def get_by_id(session: Session, user_id: int) -> User | None:
+    stmt = select(User).where(User.id == user_id)
+    return session.scalar(stmt)
+
+
 def list_users(session: Session, limit: int = 10, offset: int = 0) -> list[User]:
     """Возвращает пользователей для админского просмотра."""
 

@@ -7,7 +7,7 @@ ORM-модель пользователя Telegram.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base
@@ -38,6 +38,9 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(50), default="user")
     # Показывает, прошел ли пользователь регистрацию в боте.
     is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
+    current_lobby_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    pending_action: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    create_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Время первого и последнего появления пользователя в боте.
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

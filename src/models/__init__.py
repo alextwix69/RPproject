@@ -1,6 +1,6 @@
-"""
-Файл делает директорию models Python-пакетом.
+"""Экспорт ORM-моделей проекта."""
 
-Здесь можно экспортировать ORM-модели, чтобы repositories и Alembic могли
-импортировать таблицы проекта из одного места.
-"""
+from src.models.lobby import Lobby, LobbyMember, LobbyMessage
+from src.models.user import User
+
+__all__ = ["Lobby", "LobbyMember", "LobbyMessage", "User"]

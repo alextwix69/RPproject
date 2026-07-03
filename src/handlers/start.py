@@ -7,20 +7,15 @@
 """
 
 from src.core.logger import logger
-from telegram import ReplyKeyboardRemove, Update
+from telegram import Update
 from telegram.ext import (
     CommandHandler,
     ContextTypes
 )
 
-from src.keyboards.kb_build import build_main_menu
-
+from src.render.menu import showMainMenu
 from src.services.user_service import ensure_from_effective_user
 from src.core.database import get_session
-
-START_MESSAGE = (
-    "Добро пожаловать в RoleHub!\n"
-)
 
 # что делает бот при start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -40,15 +35,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
 
-    await update.message.reply_text(
-        START_MESSAGE,
-        reply_markup=ReplyKeyboardRemove()
-    )
-
-    await update.message.reply_text(
-        "Главное меню:",
-        reply_markup=build_main_menu()
-    )
+    await showMainMenu(update)
 
 # связь вызова /start и функции start()
 def register_start_handler(application) -> None:

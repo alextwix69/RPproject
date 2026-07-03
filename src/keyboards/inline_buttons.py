@@ -1,46 +1,113 @@
 """
-Общие inline-кнопки и callback-data.
-
-Каждая кнопка хранится как пара: видимый текст и стабильный callback_data.
+Inline-кнопки и стабильные callback-data для навигации RoleHub.
 """
 
-MAIN_PLAY_CALLBACK = "main:play"
-MAIN_SHOP_CALLBACK = "main:shop"
-MAIN_SETTINGS_CALLBACK = "main:settings"
-MAIN_SUPPORT_CALLBACK = "main:support"
+MENU_MAIN_CALLBACK = "menu:main"
+MENU_PLAY_CALLBACK = "menu:play"
+MENU_SHOP_CALLBACK = "menu:shop"
+MENU_SETTINGS_CALLBACK = "menu:settings"
+MENU_SUPPORT_CALLBACK = "menu:support"
 
-THEME_BRAWL_STARS_CALLBACK = "theme:brawl_stars"
-THEME_MY_LITTLE_PONY_CALLBACK = "theme:my_little_pony"
-THEME_ROBLOX_CALLBACK = "theme:roblox"
-THEME_BACK_CALLBACK = "theme:back"
+TOPICS = {
+    "brawl_stars": "Brawl Stars",
+    "mlp": "My Little Pony",
+    "roblox": "Roblox",
+}
 
-ADMIN_1_CALLBACK = "admin:admin1"
-ADMIN_2_CALLBACK = "admin:admin2"
-ADMIN_3_CALLBACK = "admin:admin3"
+PLAY_ACTIONS = {
+    "find": "Найти лобби",
+    "create": "Создать лобби",
+    "rooms": "Список комнат",
+}
 
 MAIN_MENU_BUTTONS = [
-    [("Играть 🎮", MAIN_PLAY_CALLBACK)],
-    [("Магазин 🛍️", MAIN_SHOP_CALLBACK)],
+    [("🎮 Играть", MENU_PLAY_CALLBACK)],
+    [("🛍 Магазин", MENU_SHOP_CALLBACK)],
     [
-        ("Настройки ⚙️", MAIN_SETTINGS_CALLBACK),
-        ("Поддержка 🆘", MAIN_SUPPORT_CALLBACK),
+        ("⚙️ Настройки", MENU_SETTINGS_CALLBACK),
+        ("🆘 Поддержка", MENU_SUPPORT_CALLBACK),
     ],
 ]
 
-ADMIN_PANEL_BUTTONS = [
-    [("admin1", ADMIN_1_CALLBACK)],
-    [("admin2", ADMIN_2_CALLBACK), ("admin3", ADMIN_3_CALLBACK)],
+PLAY_TOPICS_BUTTONS = [
+    [("⭐ Brawl Stars", "play:topic:brawl_stars")],
+    [("🦄 My Little Pony", "play:topic:mlp")],
+    [("🧱 Roblox", "play:topic:roblox")],
+    [("⬅️ Назад", MENU_MAIN_CALLBACK)],
 ]
 
-CHOOSE_THEME_BUTTONS = [
-    [("brawl stars", THEME_BRAWL_STARS_CALLBACK)],
-    [("my little pony", THEME_MY_LITTLE_PONY_CALLBACK)],
-    [("roblox", THEME_ROBLOX_CALLBACK)],
-    [("Назад", THEME_BACK_CALLBACK)],
+SHOP_BUTTONS = [
+    [("👤 Профили", "shop:profiles")],
+    [("🎨 Оформление", "shop:themes")],
+    [("💎 Премиум", "shop:premium")],
+    [("🎁 Промокод", "shop:promo")],
+    [("⬅️ Назад", MENU_MAIN_CALLBACK)],
 ]
 
-THEME_TITLES = {
-    THEME_BRAWL_STARS_CALLBACK: "brawl stars",
-    THEME_MY_LITTLE_PONY_CALLBACK: "my little pony",
-    THEME_ROBLOX_CALLBACK: "roblox",
-}
+SHOP_PROFILES_BUTTONS = [
+    [("🖼 Аватарки", "shop:profiles:avatars")],
+    [("🏷 Титулы", "shop:profiles:titles")],
+    [("⬅️ Назад", "shop:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SHOP_THEMES_BUTTONS = [
+    [("🌙 Тёмные стили", "shop:themes:dark")],
+    [("✨ Эффекты", "shop:themes:effects")],
+    [("⬅️ Назад", "shop:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SHOP_PREMIUM_BUTTONS = [
+    [("💎 Купить премиум", "shop:premium:buy")],
+    [("📋 Что входит?", "shop:premium:info")],
+    [("⬅️ Назад", "shop:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SETTINGS_BUTTONS = [
+    [("👤 Профиль", "settings:profile")],
+    [("🔔 Уведомления", "settings:notifications")],
+    [("🌐 Язык", "settings:language")],
+    [("🛡 Безопасность", "settings:safety")],
+    [("⬅️ Назад", MENU_MAIN_CALLBACK)],
+]
+
+SETTINGS_PROFILE_BUTTONS = [
+    [("✏️ Имя", "settings:profile:name")],
+    [("📝 Описание", "settings:profile:bio")],
+    [("🎭 Роль по умолчанию", "settings:profile:role")],
+    [("⬅️ Назад", "settings:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SETTINGS_NOTIFICATIONS_BUTTONS = [
+    [("✅ Лобби: Вкл", "settings:notif:lobby")],
+    [("✅ Приглашения: Вкл", "settings:notif:invites")],
+    [("✅ Новости: Вкл", "settings:notif:news")],
+    [("⬅️ Назад", "settings:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SETTINGS_LANGUAGE_BUTTONS = [
+    [("🇷🇺 Русский", "settings:lang:ru")],
+    [("🇬🇧 English", "settings:lang:en")],
+    [("⬅️ Назад", "settings:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SETTINGS_SAFETY_BUTTONS = [
+    [("🚫 Чёрный список", "settings:safety:blacklist")],
+    [("👁 Приватность профиля", "settings:safety:privacy")],
+    [("⚠️ Жалобы", "settings:safety:reports")],
+    [("⬅️ Назад", "settings:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+SUPPORT_BUTTONS = [
+    [("❓ FAQ", "support:faq")],
+    [("🐞 Сообщить об ошибке", "support:bug")],
+    [("👤 Связаться с админом", "support:admin")],
+    [("📜 Правила", "support:rules")],
+    [("⬅️ Назад", MENU_MAIN_CALLBACK)],
+]
+
+SUPPORT_FAQ_BUTTONS = [
+    [("🎮 Как играть?", "support:faq:play")],
+    [("🏠 Что такое лобби?", "support:faq:lobby")],
+    [("🛍 Как работает магазин?", "support:faq:shop")],
+    [("⬅️ Назад", "support:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]

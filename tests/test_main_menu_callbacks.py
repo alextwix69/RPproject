@@ -6,21 +6,27 @@ from src.callbacks.main_menu import (
     get_main_menu_response_text,
     resolve_main_menu_callback,
 )
+from src.keyboards.kb_build import (
+    getMainMenuKeyboard,
+    getPlayTopicsKeyboard,
+    getTopicActionsKeyboard,
+)
 
 
 def test_known_main_menu_callbacks_return_expected_intents():
     """Каждый известный callback главного меню возвращает свой intent."""
 
-    assert resolve_main_menu_callback("main:play") == MainMenuIntent.PLAY
-    assert resolve_main_menu_callback("main:shop") == MainMenuIntent.SHOP
-    assert resolve_main_menu_callback("main:settings") == MainMenuIntent.SETTINGS
-    assert resolve_main_menu_callback("main:support") == MainMenuIntent.SUPPORT
+    assert resolve_main_menu_callback("menu:main") == MainMenuIntent.MAIN
+    assert resolve_main_menu_callback("menu:play") == MainMenuIntent.PLAY
+    assert resolve_main_menu_callback("menu:shop") == MainMenuIntent.SHOP
+    assert resolve_main_menu_callback("menu:settings") == MainMenuIntent.SETTINGS
+    assert resolve_main_menu_callback("menu:support") == MainMenuIntent.SUPPORT
 
 
 def test_unknown_main_menu_callback_returns_unknown():
     """Неизвестный callback в namespace main не ломает router."""
 
-    assert resolve_main_menu_callback("main:unknown") == MainMenuIntent.UNKNOWN
+    assert resolve_main_menu_callback("menu:unknown") == MainMenuIntent.UNKNOWN
 
 
 def test_foreign_callback_namespace_returns_unknown():
@@ -41,3 +47,39 @@ def test_response_text_exists_for_every_intent():
     for intent in MainMenuIntent:
         assert intent in MAIN_MENU_RESPONSE_TEXTS
         assert get_main_menu_response_text(intent)
+
+
+def _callback_data(markup):
+    return [
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+    ]
+
+
+def test_main_menu_keyboard_uses_rolehub_callbacks():
+    assert _callback_data(getMainMenuKeyboard()) == [
+        "menu:play",
+        "menu:shop",
+        "menu:settings",
+        "menu:support",
+    ]
+
+
+def test_play_topic_keyboard_uses_expected_callbacks():
+    assert _callback_data(getPlayTopicsKeyboard()) == [
+        "play:topic:brawl_stars",
+        "play:topic:mlp",
+        "play:topic:roblox",
+        "menu:main",
+    ]
+
+
+def test_topic_actions_keyboard_has_back_and_menu_callbacks():
+    assert _callback_data(getTopicActionsKeyboard("mlp")) == [
+        "play:find:mlp",
+        "play:create:mlp",
+        "play:rooms:mlp",
+        "play:back:topics",
+        "menu:main",
+    ]

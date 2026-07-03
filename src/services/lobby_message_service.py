@@ -6,7 +6,8 @@ from telegram import Bot, Message
 
 from src.core.database import get_session
 from src.core.logger import logger
-from src.repositories import lobby_member_repo, lobby_message_repo
+from src.render.lobby_render import role_name
+from src.repositories import lobby_member_repo, lobby_message_repo, lobby_repo
 from src.repositories.user_repo import get_by_id
 from src.utils.display_name import format_display_name
 
@@ -18,7 +19,9 @@ class LobbyMessagePayload:
     file_id: str | None = None
 
 
-def format_sender_name(user) -> str:
+def format_sender_name(user, lobby=None, member=None) -> str:
+    if lobby is not None and lobby.mode == "rp" and member is not None and member.role:
+        return role_name(lobby.topic, member.role)
     return format_display_name(user)
 
 
@@ -46,7 +49,9 @@ async def send_message_to_lobby(
 ) -> None:
     with get_session() as session:
         try:
+            lobby = lobby_repo.get_by_id(session, lobby_id)
             sender = get_by_id(session, sender_id)
+            sender_member = lobby_member_repo.get_joined_member(session, lobby_id, sender_id)
             recipients = lobby_member_repo.list_joined_users(session, lobby_id)
             save_lobby_message(session, lobby_id, sender_id, payload)
             session.commit()
@@ -55,7 +60,7 @@ async def send_message_to_lobby(
             logger.exception("Failed to save lobby message")
             raise
 
-    sender_name = format_sender_name(sender)
+    sender_name = format_sender_name(sender, lobby, sender_member)
     for _member, recipient in recipients:
         if recipient.id == sender_id:
             continue

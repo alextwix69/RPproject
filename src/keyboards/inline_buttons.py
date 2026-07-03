@@ -30,7 +30,6 @@ MAIN_MENU_BUTTONS = [
 PLAY_TOPICS_BUTTONS = [
     [("⭐ Brawl Stars", "play:topic:brawl_stars")],
     [("🦄 My Little Pony", "play:topic:mlp")],
-    [("🧱 Roblox", "play:topic:roblox")],
     [("⬅️ Назад", MENU_MAIN_CALLBACK)],
 ]
 

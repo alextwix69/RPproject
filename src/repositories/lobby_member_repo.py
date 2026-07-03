@@ -39,6 +39,25 @@ def list_joined(session: Session, lobby_id: int) -> list[LobbyMember]:
     return list(session.scalars(stmt).all())
 
 
+def list_taken_roles(session: Session, lobby_id: int) -> set[str]:
+    stmt = select(LobbyMember.role).where(
+        LobbyMember.lobby_id == lobby_id,
+        LobbyMember.status == "joined",
+        LobbyMember.role.is_not(None),
+    )
+    return {role for role in session.scalars(stmt).all() if role}
+
+
+def is_role_taken(session: Session, lobby_id: int, role: str) -> bool:
+    return session.scalar(
+        select(LobbyMember.id).where(
+            LobbyMember.lobby_id == lobby_id,
+            LobbyMember.role == role,
+            LobbyMember.status == "joined",
+        )
+    ) is not None
+
+
 def list_joined_users(session: Session, lobby_id: int) -> list[tuple[LobbyMember, User]]:
     stmt = (
         select(LobbyMember, User)

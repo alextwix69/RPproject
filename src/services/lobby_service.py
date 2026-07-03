@@ -8,6 +8,7 @@ from src.core.logger import logger
 from src.models.lobby import Lobby
 from src.models.user import User
 from src.repositories import lobby_member_repo, lobby_repo
+from src.constants.roles import ROLES_BY_TOPIC
 from src.utils.invite_code import generate_lobby_code
 
 WAITING_TTL = timedelta(minutes=30)
@@ -26,6 +27,11 @@ class LobbyError(Exception):
 def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
     if user.current_lobby_id is not None:
         raise LobbyError("already_in_lobby", "Ты уже находишься в лобби.")
+
+    if payload["mode"] == "rp":
+        _validate_rp_role(lobby=None, topic=payload["topic"], role=payload.get("role"))
+        if int(payload["max_players"]) > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
+            raise LobbyError("too_many_players", "Для этой темы недостаточно уникальных ролей.")
 
     code = _generate_unique_code(session)
     now = datetime.utcnow()
@@ -74,6 +80,10 @@ def join_lobby(
         raise LobbyError("not_waiting", "Это лобби уже не ожидает участников.")
     if lobby.players_count >= lobby.max_players:
         raise LobbyError("full", "Это лобби уже заполнено.")
+    if lobby.mode == "rp":
+        _validate_rp_role(lobby=lobby, topic=lobby.topic, role=role)
+        if lobby_member_repo.is_role_taken(session, lobby.id, role):
+            raise LobbyError("role_taken", "Эта роль уже занята. Выбери другую.")
 
     now = datetime.utcnow()
     member = lobby_member_repo.get_member(session, lobby.id, user.id)
@@ -176,6 +186,13 @@ def _generate_unique_code(session: Session) -> str:
             return code
     logger.error("Could not generate unique lobby code")
     raise LobbyError("code_generation_failed", "Не удалось создать код лобби.")
+
+
+def _validate_rp_role(lobby: Lobby | None, topic: str, role: str | None) -> None:
+    if not role:
+        raise LobbyError("role_required", "Для ролевой игры нужно выбрать роль.")
+    if role not in ROLES_BY_TOPIC.get(topic, {}):
+        raise LobbyError("invalid_role", "Такой роли нет для этой темы.")
 
 
 def _resolve_lobby_for_user(session: Session, user: User, code: str | None) -> Lobby:

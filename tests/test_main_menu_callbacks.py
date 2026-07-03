@@ -71,7 +71,6 @@ def test_play_topic_keyboard_uses_expected_callbacks():
     assert _callback_data(getPlayTopicsKeyboard()) == [
         "play:topic:brawl_stars",
         "play:topic:mlp",
-        "play:topic:roblox",
         "menu:main",
     ]
 

@@ -6,6 +6,7 @@ from src.core.database import get_session
 from src.core.logger import logger
 from src.keyboards.lobby_keyboard import get_active_lobby_keyboard, get_closed_lobby_keyboard
 from src.render.lobby_render import render_active_lobby_started
+from src.render.lobby_render import role_name
 from src.repositories import lobby_member_repo, lobby_repo
 from src.repositories.user_repo import get_by_id
 from src.utils.display_name import format_display_name
@@ -36,11 +37,13 @@ async def notify_user_joined(bot: Bot, lobby_id: int, user_id: int) -> None:
     with get_session() as session:
         lobby = lobby_repo.get_by_id(session, lobby_id)
         joined_user = get_by_id(session, user_id)
+        joined_member = lobby_member_repo.get_member(session, lobby_id, user_id)
         recipients = lobby_member_repo.list_joined_users(session, lobby_id)
         if lobby is None:
             return
+        joined_name = _participant_name(lobby, joined_member, joined_user)
         text = (
-            f"✅ {format_display_name(joined_user)} вошёл в лобби.\n"
+            f"✅ {joined_name} вошёл в лобби.\n"
             f"Игроков: {lobby.players_count}/{lobby.max_players}"
         )
 
@@ -54,11 +57,13 @@ async def notify_user_left(bot: Bot, lobby_id: int, user_id: int) -> None:
     with get_session() as session:
         lobby = lobby_repo.get_by_id(session, lobby_id)
         left_user = get_by_id(session, user_id)
+        left_member = lobby_member_repo.get_member(session, lobby_id, user_id)
         recipients = lobby_member_repo.list_joined_users(session, lobby_id)
         if lobby is None:
             return
+        left_name = _participant_name(lobby, left_member, left_user)
         text = (
-            f"🚪 {format_display_name(left_user)} вышел из лобби.\n"
+            f"🚪 {left_name} вышел из лобби.\n"
             f"Игроков: {lobby.players_count}/{lobby.max_players}"
         )
 
@@ -93,3 +98,9 @@ async def _safe_send(
         await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
     except Exception:
         logger.exception("Failed to send lobby notification to chat %s", chat_id)
+
+
+def _participant_name(lobby, member, user) -> str:
+    if lobby.mode == "rp" and member is not None and member.role:
+        return role_name(lobby.topic, member.role)
+    return format_display_name(user)

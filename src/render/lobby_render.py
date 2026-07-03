@@ -106,6 +106,15 @@ def render_found_lobby(lobby: Lobby) -> str:
     )
 
 
+def render_join_role(lobby: Lobby) -> str:
+    return (
+        "🎭 Выбор роли\n\n"
+        f"Тема: {topic_name(lobby.topic)}\n"
+        f"Лобби: {lobby.players_count}/{lobby.max_players}\n\n"
+        "Выбери свободную роль для входа:"
+    )
+
+
 def render_no_lobby(topic: str) -> str:
     return (
         "😕 Свободных лобби нет\n\n"

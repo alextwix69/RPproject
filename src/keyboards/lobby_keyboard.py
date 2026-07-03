@@ -2,7 +2,7 @@
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from src.constants.roles import ROLE_BUTTONS_BY_TOPIC
+from src.constants.roles import ROLE_PAGE_SIZE, ROLES_BY_TOPIC
 from src.constants.topics import TOPIC_BUTTONS
 
 
@@ -44,20 +44,35 @@ def get_create_mode_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def get_create_role_keyboard(topic: str) -> InlineKeyboardMarkup:
-    rows = [[button] for button in ROLE_BUTTONS_BY_TOPIC.get(topic, [])]
+def get_create_role_keyboard(topic: str, page: int = 0) -> InlineKeyboardMarkup:
+    roles = list(ROLES_BY_TOPIC.get(topic, {}).items())
+    page_roles, page, pages_count = _paginate(roles, page)
+    rows = [[(label, f"create:role:{role}")] for role, label in page_roles]
+    nav = _page_nav("create:roles", page, pages_count)
+    if nav:
+        rows.append(nav)
+    rows.append([("🔎 Найти роль", "create:role_search")])
     rows.append([("🎲 Случайная", "create:role:random")])
     rows.append([("⬅️ Назад", "create:back:mode"), ("🏠 Меню", "menu:main")])
     return _build(rows)
 
 
-def get_create_size_keyboard(back_callback: str = "create:back:role_or_mode") -> InlineKeyboardMarkup:
+def get_create_size_keyboard(
+    back_callback: str = "create:back:role_or_mode",
+    max_size: int = 5,
+) -> InlineKeyboardMarkup:
+    sizes = [size for size in (2, 3, 4, 5) if size <= max_size]
+    rows = []
+    for index in range(0, len(sizes), 2):
+        rows.append(
+            [
+                (f"{size} {'игрока' if size in {2, 3, 4} else 'игроков'}", f"create:size:{size}")
+                for size in sizes[index:index + 2]
+            ]
+        )
+    rows.append([("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")])
     return _build(
-        [
-            [("2 игрока", "create:size:2"), ("3 игрока", "create:size:3")],
-            [("4 игрока", "create:size:4"), ("5 игроков", "create:size:5")],
-            [("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")],
-        ]
+        rows
     )
 
 
@@ -99,6 +114,44 @@ def get_found_lobby_keyboard(code: str, topic: str) -> InlineKeyboardMarkup:
             [("⬅️ Назад", "find:topic_menu"), ("🏠 Меню", "menu:main")],
         ]
     )
+
+
+def get_join_role_keyboard(
+    code: str,
+    topic: str,
+    taken_roles: set[str],
+    page: int = 0,
+) -> InlineKeyboardMarkup:
+    roles = [
+        (role, label)
+        for role, label in ROLES_BY_TOPIC.get(topic, {}).items()
+        if role not in taken_roles
+    ]
+    page_roles, page, pages_count = _paginate(roles, page)
+    rows = [[(label, f"lobby:role:{code}:{role}")] for role, label in page_roles]
+    nav = _page_nav(f"lobby:roles:{code}", page, pages_count)
+    if nav:
+        rows.append(nav)
+    if rows:
+        rows.append([("🔎 Найти роль", f"lobby:role_search:{code}")])
+        rows.append([("🎲 Случайная свободная", f"lobby:role:{code}:random")])
+    rows.append([("⬅️ Назад", "play:main"), ("🏠 Меню", "menu:main")])
+    return _build(rows)
+
+
+def get_role_search_results_keyboard(
+    prefix: str,
+    results: list[tuple[str, str]],
+    back_callback: str,
+) -> InlineKeyboardMarkup:
+    rows = [[(label, f"{prefix}:{role}")] for role, label in results[:ROLE_PAGE_SIZE]]
+    rows.append([("🔁 Искать ещё", back_callback)])
+    rows.append([("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")])
+    return _build(rows)
+
+
+def get_role_search_prompt_keyboard(back_callback: str) -> InlineKeyboardMarkup:
+    return _build([[("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")]])
 
 
 def get_no_lobby_keyboard(
@@ -164,3 +217,23 @@ def get_leave_done_keyboard() -> InlineKeyboardMarkup:
 
 def get_closed_lobby_keyboard() -> InlineKeyboardMarkup:
     return _build([[("🎮 Играть", "menu:play")], [("🏠 Главное меню", "menu:main")]])
+
+
+def _paginate(items, page: int):
+    pages_count = max(1, (len(items) + ROLE_PAGE_SIZE - 1) // ROLE_PAGE_SIZE)
+    safe_page = min(max(0, page), pages_count - 1)
+    start = safe_page * ROLE_PAGE_SIZE
+    return items[start:start + ROLE_PAGE_SIZE], safe_page, pages_count
+
+
+def _page_nav(prefix: str, page: int, pages_count: int):
+    if pages_count <= 1:
+        return []
+
+    row = []
+    if page > 0:
+        row.append(("◀️", f"{prefix}:{page - 1}"))
+    row.append((f"{page + 1}/{pages_count}", "noop:page"))
+    if page < pages_count - 1:
+        row.append(("▶️", f"{prefix}:{page + 1}"))
+    return row

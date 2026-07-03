@@ -63,6 +63,7 @@ async def callback_router(
         "find",
         "quick",
         "lobby",
+        "noop",
         "shop",
         "settings",
         "support",
@@ -71,6 +72,10 @@ async def callback_router(
         return
 
     await _ensure_callback_user(update)
+
+    if section == "noop":
+        await query.answer()
+        return
 
     if section == "menu":
         await handleMainMenuCallback(update, action)
@@ -342,7 +347,7 @@ def register_main_menu_handler(application) -> None:
     application.add_handler(
         CallbackQueryHandler(
             callback_router,
-            pattern=r"^(menu|play|create|find|quick|lobby|shop|settings|support):",
+            pattern=r"^(menu|play|create|find|quick|lobby|noop|shop|settings|support):",
         )
     )
     application.add_handler(CallbackQueryHandler(callback_router))

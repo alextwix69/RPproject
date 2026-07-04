@@ -47,31 +47,12 @@ def get_create_role_keyboard(topic: str, page: int = 0) -> InlineKeyboardMarkup:
     return _build(rows)
 
 
-def get_create_size_keyboard(
-    back_callback: str = "create:back:role",
-    max_size: int = 5,
-) -> InlineKeyboardMarkup:
-    sizes = [size for size in (2, 3, 4, 5) if size <= max_size]
-    rows = []
-    for index in range(0, len(sizes), 2):
-        rows.append(
-            [
-                (f"{size} {'игрока' if size in {2, 3, 4} else 'игроков'}", f"create:size:{size}")
-                for size in sizes[index:index + 2]
-            ]
-        )
-    rows.append([("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")])
-    return _build(
-        rows
-    )
-
-
 def get_create_privacy_keyboard() -> InlineKeyboardMarkup:
     return _build(
         [
             [("🌍 Открытое", "create:privacy:public")],
             [("🔒 Приватное", "create:privacy:private")],
-            [("⬅️ Назад", "create:back:size"), ("🏠 Меню", "menu:main")],
+            [("⬅️ Назад", "create:back:role"), ("🏠 Меню", "menu:main")],
         ]
     )
 
@@ -171,6 +152,14 @@ def get_active_lobby_keyboard(code: str, is_owner: bool = False) -> InlineKeyboa
         [("👥 Участники", f"lobby:members:{code}")],
         [("ℹ️ Инфо", f"lobby:info:{code}")],
     ]
+    if is_owner:
+        rows.append([("🏁 Закрыть", f"lobby:close:{code}")])
+    rows.append([("🚪 Выйти", f"lobby:leave:{code}")])
+    return _build(rows)
+
+
+def get_lobby_info_keyboard(code: str, is_owner: bool = False) -> InlineKeyboardMarkup:
+    rows = [[("👥 Участники", f"lobby:members:{code}")]]
     if is_owner:
         rows.append([("🏁 Закрыть", f"lobby:close:{code}")])
     rows.append([("🚪 Выйти", f"lobby:leave:{code}")])

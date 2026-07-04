@@ -13,6 +13,7 @@ from src.utils.invite_code import generate_lobby_code
 
 WAITING_TTL = timedelta(minutes=30)
 ACTIVE_TTL = timedelta(hours=2)
+LOBBY_MAX_PLAYERS = 15
 
 
 class LobbyError(Exception):
@@ -30,7 +31,7 @@ def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
 
     mode = "rp"
     _validate_rp_role(lobby=None, topic=payload["topic"], role=payload.get("role"))
-    if int(payload["max_players"]) > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
+    if LOBBY_MAX_PLAYERS > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
         raise LobbyError("too_many_players", "Для этой темы недостаточно уникальных ролей.")
 
     code = _generate_unique_code(session)
@@ -41,7 +42,7 @@ def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
         topic=payload["topic"],
         mode=mode,
         owner_id=user.id,
-        max_players=int(payload["max_players"]),
+        max_players=LOBBY_MAX_PLAYERS,
         players_count=1,
         privacy=payload["privacy"],
         status="waiting",

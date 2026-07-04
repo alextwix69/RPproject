@@ -39,10 +39,6 @@ def render_create_role(topic: str) -> str:
     return f"🎭 Ролевая игра\n\nТема: {topic_name(topic)}\n\nВыбери роль:"
 
 
-def render_create_size() -> str:
-    return "👥 Размер лобби\n\nСколько участников нужно?"
-
-
 def render_create_privacy() -> str:
     return "🔐 Тип лобби\n\nВыбери доступность:"
 
@@ -52,7 +48,7 @@ def render_create_confirm(state: dict) -> str:
         "✅ Проверь настройки лобби\n\n"
         f"Тема: {topic_name(state.get('topic'))}\n"
         f"Роль: {role_name(state.get('topic'), state.get('role'))}\n"
-        f"Игроков: {state.get('max_players')}\n"
+        f"Игроков: {state.get('max_players', 15)}\n"
         f"Тип: {privacy_name(state.get('privacy'))}\n\n"
         "Создать лобби?"
     )

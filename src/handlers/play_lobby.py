@@ -23,11 +23,11 @@ from src.keyboards.lobby_keyboard import (
     get_create_confirm_keyboard,
     get_create_privacy_keyboard,
     get_create_role_keyboard,
-    get_create_size_keyboard,
     get_found_lobby_keyboard,
     get_invalid_code_keyboard,
     get_join_role_keyboard,
     get_leave_done_keyboard,
+    get_lobby_info_keyboard,
     get_lobby_full_keyboard,
     get_lobby_members_keyboard,
     get_lobby_waiting_keyboard,
@@ -42,7 +42,6 @@ from src.render.lobby_render import (
     render_create_confirm,
     render_create_privacy,
     render_create_role,
-    render_create_size,
     render_create_topic,
     render_found_lobby,
     render_lobby_info,
@@ -121,24 +120,11 @@ async def handle_create_callback(update: Update, action: str, value: str, extra:
             state = get_create_state(user)
             topic = state.get("topic")
             role = _resolve_role(topic, value)
-            state = set_create_state(session, user, {"role": role})
+            state = set_create_state(session, user, {"role": role, "max_players": 15})
             clear_pending_action(user)
             session.commit()
         await _answer_role_selected(update, topic, role, value == "random")
-        max_size = len(ROLES_BY_TOPIC.get(topic or "", {})) if topic else 5
-        await _render(update, render_create_size(), get_create_size_keyboard(max_size=max_size))
-        return
-
-    if action == "roles":
-        with get_session() as session:
-            user = _ensure_user(session, update)
-            state = get_create_state(user)
-            topic = state.get("topic")
-        await _render(
-            update,
-            render_create_role(topic),
-            get_create_role_keyboard(topic, _safe_page(value)),
-        )
+        await _render(update, render_create_privacy(), get_create_privacy_keyboard())
         return
 
     if action == "role_search":
@@ -159,22 +145,16 @@ async def handle_create_callback(update: Update, action: str, value: str, extra:
         )
         return
 
-    if action == "size" and value in {"2", "3", "4", "5"}:
+    if action == "roles":
         with get_session() as session:
             user = _ensure_user(session, update)
             state = get_create_state(user)
-            max_size = len(ROLES_BY_TOPIC.get(state.get("topic") or "", {}))
-            if int(value) > max_size:
-                session.commit()
-                await _render(
-                    update,
-                    "Для этой темы недостаточно уникальных ролей на такой размер лобби.",
-                    get_create_size_keyboard(max_size=max_size),
-                )
-                return
-            set_create_state(session, user, {"max_players": int(value)})
-            session.commit()
-        await _render(update, render_create_privacy(), get_create_privacy_keyboard())
+            topic = state.get("topic")
+        await _render(
+            update,
+            render_create_role(topic),
+            get_create_role_keyboard(topic, _safe_page(value)),
+        )
         return
 
     if action == "privacy" and value in {"public", "private"}:
@@ -734,7 +714,7 @@ async def _show_lobby_info(update: Update, code: str) -> None:
             return
         member = lobby_member_repo.get_joined_member(session, lobby.id, user.id)
         is_owner = bool(member and member.is_owner)
-    await _render(update, render_lobby_info(lobby), get_active_lobby_keyboard(lobby.code, is_owner))
+    await _render(update, render_lobby_info(lobby), get_lobby_info_keyboard(lobby.code, is_owner))
 
 
 async def _show_current_lobby_info(update: Update) -> None:
@@ -842,10 +822,8 @@ async def _handle_create_back(update: Update, value: str) -> None:
         state = get_create_state(user)
     if value == "topic":
         await _show_create_topic(update)
-    elif value in {"role", "mode", "role_or_mode"}:
+    elif value in {"role", "mode", "role_or_mode", "size"}:
         await _render(update, render_create_role(state.get("topic")), get_create_role_keyboard(state.get("topic")))
-    elif value == "size":
-        await _render(update, render_create_size(), get_create_size_keyboard())
     elif value == "privacy":
         await _render(update, render_create_privacy(), get_create_privacy_keyboard())
     else:
@@ -924,7 +902,8 @@ def _validate_lobby_joinable_for_role_selection(lobby) -> None:
 
 def _validate_create_state(state: dict) -> None:
     state.setdefault("mode", "rp")
-    required = {"topic", "max_players", "privacy"}
+    state.setdefault("max_players", 15)
+    required = {"topic", "privacy"}
     if not required.issubset(state):
         raise LobbyError("invalid_state", "Настройки лобби неполные. Начни создание заново.")
 

@@ -687,7 +687,7 @@ async def _start_join_role_search(update: Update, code: str) -> None:
 
     await _render(
         update,
-        "🔎 Поиск роли\n\nНапиши имя роли или часть имени. Например: Твайлайт, Спаркл, 8-Бит.",
+        "🔎 Поиск роли\n\nНапиши имя роли или часть имени.",
         get_role_search_prompt_keyboard(f"lobby:roles:{code}:0"),
     )
 

@@ -232,12 +232,6 @@ ROLES_BY_TOPIC = {
     ),
 }
 
-ROLE_BUTTONS_BY_TOPIC = {
-    topic: [(label, f"create:role:{role}") for role, label in roles.items()]
-    for topic, roles in ROLES_BY_TOPIC.items()
-}
-
-
 def get_role_original_name(topic: str | None, role: str | None) -> str:
     if not topic or not role:
         return ""

@@ -6,7 +6,7 @@ event loop и другие объекты, которые нужны неско�
 """
 import pytest
 
-from src.core.config import get_admin_ids
+from src.core.config import get_owner_ids
 
-def test_get_admin_ids():
-    assert get_admin_ids() == [1016417047, 6665909200, 592341623] 
+def test_get_owner_ids():
+    assert get_owner_ids() == [1016417047, 592341623]

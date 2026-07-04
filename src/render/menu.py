@@ -1,14 +1,11 @@
-"""Рендер экранов inline-навигации RoleHub."""
+"""Рендер экранов reply-навигации RoleHub."""
 
-from telegram import Update
-from telegram.error import BadRequest
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 
-from src.keyboards.inline_buttons import PLAY_ACTIONS, TOPICS
 from src.keyboards.kb_build import (
     getBackToMenuKeyboard,
     getMainMenuKeyboard,
     getNamePromptKeyboard,
-    getPlayTopicsKeyboard,
     getSettingsKeyboard,
     getSettingsLanguageKeyboard,
     getSettingsNotificationsKeyboard,
@@ -20,45 +17,24 @@ from src.keyboards.kb_build import (
     getShopThemesKeyboard,
     getSupportFaqKeyboard,
     getSupportKeyboard,
-    getTopicActionsKeyboard,
 )
-from src.keyboards.lobby_keyboard import get_play_main_keyboard
+from src.keyboards.lobby_keyboard import get_play_main_reply_keyboard
 from src.render.lobby_render import render_play_main
-from src.services.chat_cleanup_service import edit_active_screen, remember_telegram_message
+from src.services.chat_cleanup_service import remember_telegram_message
 
 
 MAIN_MENU_TEXT = "Добро пожаловать в RoleHub!\n\nГлавное меню:"
 
 
 async def _render(update: Update, text: str, reply_markup=None) -> None:
-    query = update.callback_query
-
-    if query is not None:
-        await query.answer()
-        try:
-            sent_message = await query.edit_message_text(text, reply_markup=reply_markup)
-            if sent_message is not True:
-                remember_telegram_message(sent_message, is_active_screen=True)
-        except BadRequest as exc:
-            message = str(exc).lower()
-            if "message is not modified" in message:
-                return
-        return
-
     if update.message is not None:
-        if await edit_active_screen(update, text, reply_markup):
+        if isinstance(reply_markup, (ReplyKeyboardMarkup, ReplyKeyboardRemove)):
+            sent_message = await update.message.reply_text(text, reply_markup=reply_markup)
+            remember_telegram_message(sent_message, is_active_screen=True)
             return
 
         sent_message = await update.message.reply_text(text, reply_markup=reply_markup)
         remember_telegram_message(sent_message, is_active_screen=True)
-
-
-def get_topic_name(topic: str) -> str | None:
-    return TOPICS.get(topic)
-
-
-def get_action_name(action: str) -> str | None:
-    return PLAY_ACTIONS.get(action)
 
 
 async def showMainMenu(update: Update) -> None:
@@ -81,20 +57,7 @@ async def showPlayTopics(update: Update) -> None:
     await _render(
         update,
         render_play_main(),
-        get_play_main_keyboard(),
-    )
-
-
-async def showTopicActions(update: Update, topic: str) -> None:
-    topic_name = get_topic_name(topic)
-    if topic_name is None:
-        await showPlayTopics(update)
-        return
-
-    await _render(
-        update,
-        f"🎮 Тема: {topic_name}\n\nЧто хочешь сделать?",
-        getTopicActionsKeyboard(topic),
+        get_play_main_reply_keyboard(),
     )
 
 
@@ -201,13 +164,13 @@ async def showComingSoon(
     update: Update,
     title: str,
     description: str,
-    backCallback: str,
+    back_target: str,
 ) -> None:
     text = f"🚧 Раздел в разработке\n\n{title}"
     if description:
         text = f"{text}\n\n{description}"
 
-    await _render(update, text, getBackToMenuKeyboard(backCallback))
+    await _render(update, text, getBackToMenuKeyboard(back_target))
 
 
 async def showPremiumInfo(update: Update) -> None:

@@ -29,10 +29,10 @@ def get_database_url() -> str:
         raise RuntimeError("db_url не получен")
     return db_url
 
-def get_admin_ids() -> list[int]:
-    admin_ids = [
+def get_owner_ids() -> list[int]:
+    owner_ids = [
         int(x)
-        for x in os.getenv("ADMIN_IDS", "").split(",")
+        for x in os.getenv("OWNER_IDS", "").split(",")
         if x
     ]
-    return admin_ids
+    return owner_ids

@@ -60,23 +60,22 @@ tests/test_user_repository.py
 -> users
 ```
 
-## Главное меню и callback-router
+## Главное меню и reply-клавиатуры
 
-Файл: `tests/test_main_menu_callbacks.py`
+Файл: `tests/test_reply_keyboards.py`
 
-Эти тесты проверяют чистую бизнес-логику callback-data без Telegram, БД и handlers.
+Эти тесты проверяют состав reply-клавиатур без Telegram, БД и handlers.
 
-- `test_known_main_menu_callbacks_return_expected_intents` - известные callback-data `main:*` возвращают правильные intent.
-- `test_unknown_main_menu_callback_returns_unknown` - неизвестный callback внутри namespace `main` возвращает `MainMenuIntent.UNKNOWN`.
-- `test_foreign_callback_namespace_returns_unknown` - callback из чужого namespace возвращает `MainMenuIntent.UNKNOWN`.
-- `test_empty_callback_returns_unknown` - пустая callback-data не ломает router и возвращает `MainMenuIntent.UNKNOWN`.
-- `test_response_text_exists_for_every_intent` - для каждого `MainMenuIntent` есть непустой UX-текст ответа.
+- `test_main_menu_keyboard_uses_reply_buttons` - главное меню собирается как reply-клавиатура.
+- `test_admin_panel_uses_reply_buttons` - админ-панель собирается как reply-клавиатура.
+- `test_active_lobby_reply_keyboard_has_room_controls_without_leave` - активная комната не содержит `/leave`.
 
 Проверяемый путь:
 
 ```text
-tests/test_main_menu_callbacks.py
--> src/callbacks/main_menu.py
+tests/test_reply_keyboards.py
+-> src/keyboards/kb_build.py
+-> src/keyboards/lobby_keyboard.py
 ```
 
 ## Стартовый сценарий
@@ -103,7 +102,7 @@ tests/test_main_menu_callbacks.py
 
 Файл: `tests/conftest.py`
 
-В файле лежат общие настройки и будущие фикстуры pytest. Сейчас там есть проверка `test_get_admin_ids`, но `conftest.py` не является обычным тестовым модулем для pytest-collection, поэтому эту проверку лучше перенести в отдельный файл, например:
+В файле лежат общие настройки и будущие фикстуры pytest. Сейчас там есть проверка `test_get_owner_ids`, но `conftest.py` не является обычным тестовым модулем для pytest-collection, поэтому эту проверку лучше перенести в отдельный файл, например:
 
 ```text
 tests/test_config.py
@@ -114,6 +113,6 @@ tests/test_config.py
 Исполняемых тестов сейчас: `10`.
 
 - `5` тестов пользовательского service/repository слоя;
-- `5` тестов callback-router главного меню;
+- тесты reply-клавиатур главного меню и комнаты;
 - `0` тестов `/start`;
 - `0` тестов регистрации.

@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import csv
+import re
 from datetime import datetime
 from io import BytesIO, StringIO
 
 from telegram import InputFile, Update
-from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
+from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 
-from src.core.config import get_admin_ids
 from src.core.database import get_session
+from src.keyboards.kb_build import BTN_ADMIN_EXPORT, BTN_ADMIN_STATS, BTN_ADMIN_USERS
 from src.keyboards.kb_build import build_admin_panel
 from src.models.user import User
+from src.services.admin_service import is_admin_effective_user
 from src.services.chat_cleanup_service import remember_telegram_message, reply_text
 from src.repositories.user_repo import (
     get_by_telegram_id,
@@ -23,17 +25,10 @@ from src.repositories.user_repo import (
 
 
 def _is_admin(update: Update) -> bool:
-    return (
-        update.effective_user is not None
-        and update.effective_user.id in get_admin_ids()
-    )
+    return is_admin_effective_user(update.effective_user)
 
 
 async def _deny(update: Update) -> None:
-    if update.callback_query is not None:
-        await update.callback_query.answer("Нет доступа", show_alert=True)
-        return
-
     if update.message is not None:
         await reply_text(update.message, "Нет доступа")
 
@@ -251,47 +246,35 @@ async def export_users_command(update: Update, context: ContextTypes.DEFAULT_TYP
         remember_telegram_message(sent_message)
 
 
-async def admin_users_callback(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    query = update.callback_query
-
-    if query is None:
+async def admin_users_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.message.text is None:
         return
 
     if not _is_admin(update):
         await _deny(update)
         return
 
-    if query.data == "admin:users":
-        await query.answer()
-        sent_message = await query.edit_message_text(
-            _users_text(),
-            reply_markup=build_admin_panel(),
-        )
-        if sent_message is not True:
-            remember_telegram_message(sent_message, is_active_screen=True)
+    text = update.message.text.strip()
+    if text == BTN_ADMIN_USERS:
+        await reply_text(update.message, _users_text(), reply_markup=build_admin_panel())
         return
 
-    if query.data == "admin:stats":
-        await query.answer()
-        sent_message = await query.edit_message_text(
-            _stats_text(),
-            reply_markup=build_admin_panel(),
-        )
-        if sent_message is not True:
-            remember_telegram_message(sent_message, is_active_screen=True)
+    if text == BTN_ADMIN_STATS:
+        await reply_text(update.message, _stats_text(), reply_markup=build_admin_panel())
         return
 
-    if query.data == "admin:export_users":
-        await query.answer("Готовлю CSV")
-        if query.message is not None:
-            sent_message = await query.message.reply_document(
-                document=_users_csv_file(),
-                caption="Экспорт пользователей из БД",
-            )
-            remember_telegram_message(sent_message)
+    if text == BTN_ADMIN_EXPORT:
+        sent_message = await update.message.reply_document(
+            document=_users_csv_file(),
+            caption="Экспорт пользователей из БД",
+        )
+        remember_telegram_message(sent_message)
+
+
+def _admin_users_filter():
+    buttons = {BTN_ADMIN_USERS, BTN_ADMIN_STATS, BTN_ADMIN_EXPORT}
+    pattern = "^(?:" + "|".join(re.escape(button) for button in buttons) + ")$"
+    return filters.TEXT & ~filters.COMMAND & filters.Regex(pattern)
 
 
 def register_admin_users_handlers(application) -> None:
@@ -299,9 +282,4 @@ def register_admin_users_handlers(application) -> None:
     application.add_handler(CommandHandler("user", user_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("export_users", export_users_command))
-    application.add_handler(
-        CallbackQueryHandler(
-            admin_users_callback,
-            pattern=r"^admin:(users|stats|export_users)$",
-        )
-    )
+    application.add_handler(MessageHandler(_admin_users_filter(), admin_users_reply_handler))

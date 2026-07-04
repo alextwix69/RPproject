@@ -1,201 +1,190 @@
-"""Inline-клавиатуры lobby-механики."""
+"""Клавиатуры lobby-механики."""
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 
 from src.constants.roles import ROLE_PAGE_SIZE, ROLES_BY_TOPIC
 from src.constants.topics import TOPIC_BUTTONS
 
+BTN_BACK = "⬅️ Назад"
+BTN_MAIN_MENU = "🏠 Главное меню"
+BTN_CREATE_LOBBY = "➕ Создать лобби"
+BTN_FIND_LOBBY = "🔎 Найти лобби"
+BTN_SEARCH_BY_CODE = "🔑 Поиск лобби по коду"
+BTN_SELECT_TOPIC = "🎯 Выбор темы"
+BTN_PUBLIC = "🌍 Публичное"
+BTN_PRIVATE = "🔒 Приватное"
+BTN_FIND_ROLE = "🔎 Найти роль"
+BTN_RANDOM_ROLE = "🎲 Случайная"
+BTN_RANDOM_FREE_ROLE = "🎲 Случайная свободная"
+BTN_CREATE_CONFIRM = "🚀 Создать лобби"
+BTN_EDIT = "✏️ Изменить"
+BTN_REFRESH = "🔄 Обновить"
+BTN_INVITE = "📨 Пригласить"
+BTN_START = "▶️ Запустить"
+BTN_CLOSE = "🏁 Закрыть"
+BTN_JOIN = "✅ Войти"
+BTN_NEXT = "🔄 Следующее"
+BTN_MEMBERS = "👥 Участники"
+BTN_INFO = "ℹ️ Инфо"
+BTN_SEARCH_AGAIN = "🔄 Искать снова"
+BTN_FIND_ANOTHER = "🔎 Найти другое"
+BTN_CREATE_OWN = "➕ Создать своё"
+BTN_PLAY = "🎮 Играть"
+BTN_SEARCH_MORE = "🔁 Искать ещё"
+BTN_TRY_AGAIN = "🔁 Попробовать ещё"
+BTN_RETURN_TO_LOBBY = "Вернуться в лобби"
 
-def _build(rows) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(text=text, callback_data=data) for text, data in row] for row in rows]
+
+def _reply(rows: list[list[str]]) -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        rows,
+        resize_keyboard=True,
+        input_field_placeholder="Выбери действие",
     )
 
 
-def get_play_main_keyboard() -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("🔎 Найти лобби", "play:find")],
-            [("➕ Создать лобби", "play:create")],
-            [("⚡ Быстрый вход", "play:quick")],
-            [("🔑 Войти по коду", "play:code")],
-            [("⬅️ Назад", "menu:main")],
-        ]
-    )
+def _with_nav(rows: list[list[str]]) -> list[list[str]]:
+    return rows + [[BTN_BACK, BTN_MAIN_MENU]]
 
 
-def get_topic_keyboard(prefix: str, back_callback: str = "play:main") -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [(label, f"{prefix}:topic:{topic}")]
-            for topic, label in TOPIC_BUTTONS.items()
-        ]
-        + [[("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")]]
-    )
+def get_play_main_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_CREATE_LOBBY, BTN_FIND_LOBBY]]))
 
 
-def get_create_role_keyboard(topic: str, page: int = 0) -> InlineKeyboardMarkup:
+def get_find_main_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_SEARCH_BY_CODE], [BTN_SELECT_TOPIC]]))
+
+
+def get_topic_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[label] for label in TOPIC_BUTTONS.values()]))
+
+
+def get_create_role_reply_keyboard(topic: str, page: int = 0) -> ReplyKeyboardMarkup:
     roles = list(ROLES_BY_TOPIC.get(topic, {}).items())
     page_roles, page, pages_count = _paginate(roles, page)
-    rows = [[(label, f"create:role:{role}")] for role, label in page_roles]
-    nav = _page_nav("create:roles", page, pages_count)
+    rows = [[label] for _role, label in page_roles]
+    nav = _reply_page_nav(page, pages_count)
     if nav:
         rows.append(nav)
-    rows.append([("🔎 Найти роль", "create:role_search")])
-    rows.append([("🎲 Случайная", "create:role:random")])
-    rows.append([("⬅️ Назад", "create:back:topic"), ("🏠 Меню", "menu:main")])
-    return _build(rows)
+    rows.append([BTN_FIND_ROLE])
+    rows.append([BTN_RANDOM_ROLE])
+    return _reply(_with_nav(rows))
 
 
-def get_create_privacy_keyboard() -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("🌍 Открытое", "create:privacy:public")],
-            [("🔒 Приватное", "create:privacy:private")],
-            [("⬅️ Назад", "create:back:role"), ("🏠 Меню", "menu:main")],
-        ]
-    )
+def get_create_privacy_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_PUBLIC, BTN_PRIVATE]]))
 
 
-def get_create_confirm_keyboard() -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("🚀 Создать лобби", "create:confirm")],
-            [("✏️ Изменить", "create:edit")],
-            [("⬅️ Назад", "create:back:privacy"), ("🏠 Меню", "menu:main")],
-        ]
-    )
+def get_create_confirm_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_CREATE_CONFIRM], [BTN_EDIT]]))
 
 
-def get_lobby_waiting_keyboard(code: str, is_owner: bool) -> InlineKeyboardMarkup:
-    rows = [[("🔄 Обновить", f"lobby:refresh:{code}")]]
+def get_lobby_waiting_reply_keyboard(is_owner: bool) -> ReplyKeyboardMarkup:
+    rows = [[BTN_REFRESH]]
     if is_owner:
-        rows.append([("📨 Пригласить", f"lobby:invite:{code}")])
-        rows.append([("▶️ Запустить", f"lobby:start:{code}")])
-        rows.append([("🏁 Закрыть", f"lobby:close:{code}")])
-    rows.append([("🚪 Выйти", f"lobby:leave:{code}")])
-    return _build(rows)
+        rows.append([BTN_INVITE])
+        rows.append([BTN_START])
+        rows.append([BTN_CLOSE])
+    return _reply(_with_nav(rows))
 
 
-def get_found_lobby_keyboard(code: str, topic: str) -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("✅ Войти", f"lobby:join:{code}")],
-            [("🔄 Следующее", f"find:next:{topic}:{code}")],
-            [("⬅️ Назад", "find:topic_menu"), ("🏠 Меню", "menu:main")],
-        ]
-    )
+def get_found_lobby_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_JOIN], [BTN_NEXT]]))
 
 
-def get_join_role_keyboard(
+def get_join_role_reply_keyboard(
     code: str,
     topic: str,
     taken_roles: set[str],
     page: int = 0,
-) -> InlineKeyboardMarkup:
+) -> ReplyKeyboardMarkup:
     roles = [
         (role, label)
         for role, label in ROLES_BY_TOPIC.get(topic, {}).items()
         if role not in taken_roles
     ]
     page_roles, page, pages_count = _paginate(roles, page)
-    rows = [[(label, f"lobby:role:{code}:{role}")] for role, label in page_roles]
-    nav = _page_nav(f"lobby:roles:{code}", page, pages_count)
+    rows = [[label] for _role, label in page_roles]
+    nav = _reply_page_nav(page, pages_count)
     if nav:
         rows.append(nav)
     if rows:
-        rows.append([("🔎 Найти роль", f"lobby:role_search:{code}")])
-        rows.append([("🎲 Случайная свободная", f"lobby:role:{code}:random")])
-    rows.append([("⬅️ Назад", "play:main"), ("🏠 Меню", "menu:main")])
-    return _build(rows)
+        rows.append([BTN_FIND_ROLE])
+        rows.append([BTN_RANDOM_FREE_ROLE])
+    return _reply(_with_nav(rows))
 
 
-def get_role_search_results_keyboard(
-    prefix: str,
-    results: list[tuple[str, str]],
-    back_callback: str,
-) -> InlineKeyboardMarkup:
-    rows = [[(label, f"{prefix}:{role}")] for role, label in results[:ROLE_PAGE_SIZE]]
-    rows.append([("🔁 Искать ещё", back_callback)])
-    rows.append([("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")])
-    return _build(rows)
+def get_role_search_results_reply_keyboard(results: list[tuple[str, str]]) -> ReplyKeyboardMarkup:
+    rows = [[label] for _role, label in results[:ROLE_PAGE_SIZE]]
+    rows.append([BTN_SEARCH_MORE])
+    return _reply(_with_nav(rows))
 
 
-def get_role_search_prompt_keyboard(back_callback: str) -> InlineKeyboardMarkup:
-    return _build([[("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")]])
+def get_role_search_prompt_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([]))
 
 
-def get_no_lobby_keyboard(
-    topic: str,
-    retry_callback: str,
-    back_callback: str = "find:topic_menu",
-) -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("➕ Создать лобби", f"create:from_find:{topic}")],
-            [("🔄 Искать снова", retry_callback)],
-            [("⬅️ Назад", back_callback), ("🏠 Меню", "menu:main")],
-        ]
-    )
+def get_no_lobby_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_CREATE_LOBBY], [BTN_SEARCH_AGAIN]]))
 
 
-def get_code_entry_keyboard() -> InlineKeyboardMarkup:
-    return _build([[("⬅️ Назад", "play:main")], [("🏠 Главное меню", "menu:main")]])
+def get_code_entry_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([]))
 
 
-def get_invalid_code_keyboard() -> InlineKeyboardMarkup:
-    return _build([[("🔁 Попробовать ещё", "play:code")], [("🏠 Главное меню", "menu:main")]])
+def get_invalid_code_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_TRY_AGAIN]]))
 
 
-def get_active_lobby_keyboard(code: str, is_owner: bool = False) -> InlineKeyboardMarkup:
-    rows = [
-        [("👥 Участники", f"lobby:members:{code}")],
-        [("ℹ️ Инфо", f"lobby:info:{code}")],
-    ]
+def get_active_lobby_reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
+    rows = [[BTN_MEMBERS, BTN_INFO]]
     if is_owner:
-        rows.append([("🏁 Закрыть", f"lobby:close:{code}")])
-    rows.append([("🚪 Выйти", f"lobby:leave:{code}")])
-    return _build(rows)
+        rows.append([BTN_CLOSE])
+    return _reply(_with_nav(rows))
 
 
-def get_lobby_info_keyboard(code: str, is_owner: bool = False) -> InlineKeyboardMarkup:
-    rows = [[("👥 Участники", f"lobby:members:{code}")]]
+def get_lobby_info_reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup:
+    rows = [[BTN_MEMBERS]]
     if is_owner:
-        rows.append([("🏁 Закрыть", f"lobby:close:{code}")])
-    rows.append([("🚪 Выйти", f"lobby:leave:{code}")])
-    return _build(rows)
+        rows.append([BTN_CLOSE])
+    return _reply(_with_nav(rows))
 
 
-def get_lobby_members_keyboard(code: str) -> InlineKeyboardMarkup:
-    return _build([[("⬅️ Назад", f"lobby:info:{code}")], [("🚪 Выйти", f"lobby:leave:{code}")]])
+def get_lobby_members_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([]))
 
 
-def get_already_in_lobby_keyboard() -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("Вернуться в лобби", "lobby:info_current")],
-            [("🚪 Выйти из лобби", "lobby:leave_current")],
-            [("🏠 Главное меню", "menu:main")],
-        ]
-    )
+def get_already_in_lobby_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_RETURN_TO_LOBBY]]))
 
 
-def get_lobby_full_keyboard() -> InlineKeyboardMarkup:
-    return _build(
-        [
-            [("🔎 Найти другое", "play:find")],
-            [("➕ Создать своё", "play:create")],
-            [("🏠 Главное меню", "menu:main")],
-        ]
-    )
+def get_lobby_full_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_FIND_ANOTHER], [BTN_CREATE_OWN]]))
 
 
-def get_leave_done_keyboard() -> InlineKeyboardMarkup:
-    return _build([[("🎮 Играть", "menu:play")], [("🏠 Главное меню", "menu:main")]])
+def get_done_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([[BTN_PLAY]]))
 
 
-def get_closed_lobby_keyboard() -> InlineKeyboardMarkup:
-    return _build([[("🎮 Играть", "menu:play")], [("🏠 Главное меню", "menu:main")]])
+def get_remove_lobby_reply_keyboard() -> ReplyKeyboardRemove:
+    return ReplyKeyboardRemove()
+
+
+def role_by_label(topic: str | None, label: str) -> str | None:
+    for role, role_label in ROLES_BY_TOPIC.get(topic or "", {}).items():
+        if role_label == label:
+            return role
+    return None
+
+
+def topic_by_label(label: str) -> str | None:
+    for topic, topic_label in TOPIC_BUTTONS.items():
+        if topic_label == label:
+            return topic
+    return None
 
 
 def _paginate(items, page: int):
@@ -205,14 +194,14 @@ def _paginate(items, page: int):
     return items[start:start + ROLE_PAGE_SIZE], safe_page, pages_count
 
 
-def _page_nav(prefix: str, page: int, pages_count: int):
+def _reply_page_nav(page: int, pages_count: int) -> list[str]:
     if pages_count <= 1:
         return []
 
     row = []
     if page > 0:
-        row.append(("◀️", f"{prefix}:{page - 1}"))
-    row.append((f"{page + 1}/{pages_count}", "noop:page"))
+        row.append("◀️")
+    row.append(f"{page + 1}/{pages_count}")
     if page < pages_count - 1:
-        row.append(("▶️", f"{prefix}:{page + 1}"))
+        row.append("▶️")
     return row

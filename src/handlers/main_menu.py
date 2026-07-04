@@ -1,16 +1,54 @@
-from telegram import Update
-from telegram.ext import CallbackQueryHandler, ContextTypes
+import re
 
+from telegram import Update
+from telegram.ext import ContextTypes, MessageHandler, filters
+
+from src.constants.pending_actions import PENDING_SET_DISPLAY_NAME
 from src.core.database import get_session
-from src.keyboards.inline_buttons import PLAY_ACTIONS, TOPICS
+from src.handlers.play_lobby import show_play_menu
+from src.keyboards.kb_build import (
+    BTN_BACK,
+    BTN_FAQ_LOBBY,
+    BTN_FAQ_PLAY,
+    BTN_FAQ_SHOP,
+    BTN_LANGUAGE_RU,
+    BTN_MAIN_MENU,
+    BTN_NAME_LATER,
+    BTN_NOTIF_INVITES,
+    BTN_NOTIF_LOBBY,
+    BTN_PLAY,
+    BTN_PROFILE_BIO,
+    BTN_PROFILE_NAME,
+    BTN_SAFETY_BLACKLIST,
+    BTN_SAFETY_PRIVACY,
+    BTN_SAFETY_REPORTS,
+    BTN_SETTINGS,
+    BTN_SETTINGS_LANGUAGE,
+    BTN_SETTINGS_NOTIFICATIONS,
+    BTN_SETTINGS_PROFILE,
+    BTN_SETTINGS_SAFETY,
+    BTN_SHOP,
+    BTN_SHOP_AVATARS,
+    BTN_SHOP_BUY_PREMIUM,
+    BTN_SHOP_DARK,
+    BTN_SHOP_EFFECTS,
+    BTN_SHOP_PREMIUM,
+    BTN_SHOP_PREMIUM_INFO,
+    BTN_SHOP_PROFILES,
+    BTN_SHOP_PROMO,
+    BTN_SHOP_THEMES,
+    BTN_SHOP_TITLES,
+    BTN_SUPPORT,
+    BTN_SUPPORT_ADMIN,
+    BTN_SUPPORT_BUG,
+    BTN_SUPPORT_FAQ,
+    BTN_SUPPORT_RULES,
+)
 from src.render.menu import (
-    get_action_name,
-    get_topic_name,
     showComingSoon,
     showFaqAnswer,
     showMainMenu,
     showNamePrompt,
-    showPlayTopics,
     showPremiumInfo,
     showRules,
     showSettings,
@@ -24,21 +62,163 @@ from src.render.menu import (
     showShopThemes,
     showSupport,
     showSupportFaq,
-    showTopicActions,
-)
-from src.constants.callbacks import PENDING_SET_DISPLAY_NAME
-from src.handlers.play_lobby import (
-    handle_create_callback,
-    handle_find_callback,
-    handle_lobby_callback,
-    handle_play_callback as handle_lobby_play_callback,
-    handle_quick_callback,
 )
 from src.services.user_service import ensure_from_effective_user, toggle_news_notifications
 from src.services.user_state_service import clear_pending_action, set_pending_action
 
+BTN_NEWS_ON = "✅ Новости: Вкл"
+BTN_NEWS_OFF = "❌ Новости: Выкл"
 
-async def _ensure_callback_user(update: Update) -> None:
+MENU_BUTTONS = {
+    BTN_PLAY,
+    BTN_SHOP,
+    BTN_SETTINGS,
+    BTN_SUPPORT,
+    BTN_SHOP_PROFILES,
+    BTN_SHOP_THEMES,
+    BTN_SHOP_PREMIUM,
+    BTN_SHOP_PROMO,
+    BTN_SHOP_AVATARS,
+    BTN_SHOP_TITLES,
+    BTN_SHOP_DARK,
+    BTN_SHOP_EFFECTS,
+    BTN_SHOP_BUY_PREMIUM,
+    BTN_SHOP_PREMIUM_INFO,
+    BTN_SETTINGS_PROFILE,
+    BTN_SETTINGS_NOTIFICATIONS,
+    BTN_SETTINGS_LANGUAGE,
+    BTN_SETTINGS_SAFETY,
+    BTN_PROFILE_NAME,
+    BTN_PROFILE_BIO,
+    BTN_NOTIF_LOBBY,
+    BTN_NOTIF_INVITES,
+    BTN_NEWS_ON,
+    BTN_NEWS_OFF,
+    BTN_LANGUAGE_RU,
+    BTN_NAME_LATER,
+    BTN_SAFETY_BLACKLIST,
+    BTN_SAFETY_PRIVACY,
+    BTN_SAFETY_REPORTS,
+    BTN_SUPPORT_FAQ,
+    BTN_SUPPORT_BUG,
+    BTN_SUPPORT_ADMIN,
+    BTN_SUPPORT_RULES,
+    BTN_FAQ_PLAY,
+    BTN_FAQ_LOBBY,
+    BTN_FAQ_SHOP,
+}
+
+
+async def main_menu_reply_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.message.text is None:
+        return
+
+    text = update.message.text.strip()
+    _ensure_reply_user(update)
+
+    if text == BTN_MAIN_MENU:
+        _clear_name_pending(update)
+        await showMainMenu(update)
+        return
+
+    if text == BTN_BACK:
+        await showMainMenu(update)
+        return
+
+    if text == BTN_PLAY:
+        await show_play_menu(update)
+        return
+
+    if text == BTN_SHOP:
+        await showShop(update)
+        return
+
+    if text == BTN_SETTINGS:
+        await showSettings(update)
+        return
+
+    if text == BTN_SUPPORT:
+        await showSupport(update)
+        return
+
+    await _handle_shop_text(update, text)
+    await _handle_settings_text(update, text)
+    await _handle_support_text(update, text)
+
+
+async def _handle_shop_text(update: Update, text: str) -> None:
+    if text == BTN_SHOP_PROFILES:
+        await showShopProfiles(update)
+    elif text == BTN_SHOP_THEMES:
+        await showShopThemes(update)
+    elif text == BTN_SHOP_PREMIUM:
+        await showShopPremium(update)
+    elif text == BTN_SHOP_PROMO:
+        await showComingSoon(update, "Промокод", "Ввод промокодов пока в разработке.", "shop")
+    elif text == BTN_SHOP_AVATARS:
+        await showComingSoon(update, "Аватарки", "Скоро здесь появятся предметы для профиля.", "shop")
+    elif text == BTN_SHOP_TITLES:
+        await showComingSoon(update, "Титулы", "Скоро здесь появятся предметы для профиля.", "shop")
+    elif text == BTN_SHOP_DARK:
+        await showComingSoon(update, "Тёмные стили", "Скоро здесь появятся визуальные стили.", "shop")
+    elif text == BTN_SHOP_EFFECTS:
+        await showComingSoon(update, "Эффекты", "Скоро здесь появятся визуальные стили.", "shop")
+    elif text == BTN_SHOP_BUY_PREMIUM:
+        await showComingSoon(update, "Покупка премиума пока в разработке.", "", "shop")
+    elif text == BTN_SHOP_PREMIUM_INFO:
+        await showPremiumInfo(update)
+
+
+async def _handle_settings_text(update: Update, text: str) -> None:
+    if text == BTN_SETTINGS_PROFILE:
+        await showSettingsProfile(update, _get_current_display_name(update))
+    elif text == BTN_SETTINGS_NOTIFICATIONS:
+        await showSettingsNotifications(update, _get_current_user_settings(update))
+    elif text == BTN_SETTINGS_LANGUAGE:
+        await showSettingsLanguage(update)
+    elif text == BTN_SETTINGS_SAFETY:
+        await showSettingsSafety(update)
+    elif text == BTN_PROFILE_NAME:
+        _set_name_pending(update)
+        await showNamePrompt(update)
+    elif text == BTN_PROFILE_BIO:
+        await showComingSoon(update, "Описание", "", "settings")
+    elif text in {BTN_NOTIF_LOBBY, BTN_NOTIF_INVITES}:
+        await showComingSoon(update, "Настройки уведомлений будут доступны позже.", "", "settings")
+    elif text in {BTN_NEWS_ON, BTN_NEWS_OFF}:
+        await _toggle_news_notifications(update)
+    elif text == BTN_LANGUAGE_RU:
+        await showComingSoon(update, "Выбор языка будет доступен позже.", "", "settings")
+    elif text == BTN_NAME_LATER:
+        _clear_name_pending(update)
+        await showMainMenu(update)
+    elif text in {BTN_SAFETY_BLACKLIST, BTN_SAFETY_PRIVACY, BTN_SAFETY_REPORTS}:
+        titles = {
+            BTN_SAFETY_BLACKLIST: "Чёрный список",
+            BTN_SAFETY_PRIVACY: "Приватность профиля",
+            BTN_SAFETY_REPORTS: "Жалобы",
+        }
+        await showComingSoon(update, titles[text], "", "settings")
+
+
+async def _handle_support_text(update: Update, text: str) -> None:
+    if text == BTN_SUPPORT_FAQ:
+        await showSupportFaq(update)
+    elif text == BTN_SUPPORT_BUG:
+        await showComingSoon(update, "Сообщить об ошибке", "Функция отправки баг-репортов пока в разработке.", "support")
+    elif text == BTN_SUPPORT_ADMIN:
+        await showComingSoon(update, "Связаться с админом", "Связь с администратором пока в разработке.", "support")
+    elif text == BTN_SUPPORT_RULES:
+        await showRules(update)
+    elif text == BTN_FAQ_PLAY:
+        await showFaqAnswer(update, "play")
+    elif text == BTN_FAQ_LOBBY:
+        await showFaqAnswer(update, "lobby")
+    elif text == BTN_FAQ_SHOP:
+        await showFaqAnswer(update, "shop")
+
+
+def _ensure_reply_user(update: Update) -> None:
     with get_session() as session:
         try:
             ensure_from_effective_user(session, update.effective_user)
@@ -46,317 +226,6 @@ async def _ensure_callback_user(update: Update) -> None:
         except Exception:
             session.rollback()
             raise
-
-
-async def callback_router(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    query = update.callback_query
-    if query is None:
-        return
-
-    data = query.data or ""
-    section, action, value, extra = (data.split(":") + ["", "", "", ""])[:4]
-
-    if section not in {
-        "menu",
-        "play",
-        "create",
-        "find",
-        "quick",
-        "lobby",
-        "noop",
-        "shop",
-        "settings",
-        "support",
-    }:
-        await query.answer("Действие недоступно")
-        return
-
-    await _ensure_callback_user(update)
-
-    if section == "noop":
-        await query.answer()
-        return
-
-    if section == "menu":
-        await handleMainMenuCallback(update, action)
-        return
-
-    if section == "play":
-        await handlePlayCallback(update, action, value, extra)
-        return
-
-    if section == "create":
-        await handle_create_callback(update, action, value, extra)
-        return
-
-    if section == "find":
-        await handle_find_callback(update, action, value, extra)
-        return
-
-    if section == "quick":
-        await handle_quick_callback(update, action, value, extra)
-        return
-
-    if section == "lobby":
-        await handle_lobby_callback(update, action, value, extra)
-        return
-
-    if section == "shop":
-        await handleShopCallback(update, action, value)
-        return
-
-    if section == "settings":
-        await handleSettingsCallback(update, action, value)
-        return
-
-    if section == "support":
-        await handleSupportCallback(update, action, value)
-        return
-
-
-async def handleMainMenuCallback(update: Update, action: str) -> None:
-    if action == "main":
-        _clear_name_pending(update)
-        await showMainMenu(update)
-        return
-
-    if action == "play":
-        await showPlayTopics(update)
-        return
-
-    if action == "shop":
-        await showShop(update)
-        return
-
-    if action == "settings":
-        await showSettings(update)
-        return
-
-    if action == "support":
-        await showSupport(update)
-        return
-
-    await _answer_unavailable(update)
-
-
-async def handlePlayCallback(update: Update, action: str, value: str, extra: str) -> None:
-    if await handle_lobby_play_callback(update, action, value, extra):
-        return
-
-    if action == "topic":
-        if value not in TOPICS:
-            await showPlayTopics(update)
-            return
-        await showTopicActions(update, value)
-        return
-
-    if action == "back" and value == "topics":
-        await showPlayTopics(update)
-        return
-
-    if action == "back" and value == "actions":
-        if extra not in TOPICS:
-            await showPlayTopics(update)
-            return
-        await showTopicActions(update, extra)
-        return
-
-    if action in PLAY_ACTIONS:
-        topic_name = get_topic_name(value)
-        action_name = get_action_name(action)
-        if topic_name is None or action_name is None:
-            await showPlayTopics(update)
-            return
-
-        await showComingSoon(
-            update,
-            action_name,
-            f"Тема: {topic_name}",
-            f"play:back:actions:{value}",
-        )
-        return
-
-    await _answer_unavailable(update)
-
-
-async def handleShopCallback(update: Update, action: str, value: str) -> None:
-    if action == "back":
-        await showShop(update)
-        return
-
-    if action == "profiles" and not value:
-        await showShopProfiles(update)
-        return
-
-    if action == "profiles" and value in {"avatars", "titles"}:
-        title = "Аватарки" if value == "avatars" else "Титулы"
-        await showComingSoon(
-            update,
-            title,
-            "Скоро здесь появятся предметы для профиля.",
-            "shop:profiles",
-        )
-        return
-
-    if action == "themes" and not value:
-        await showShopThemes(update)
-        return
-
-    if action == "themes" and value in {"dark", "effects"}:
-        title = "Тёмные стили" if value == "dark" else "Эффекты"
-        await showComingSoon(
-            update,
-            title,
-            "Скоро здесь появятся визуальные стили.",
-            "shop:themes",
-        )
-        return
-
-    if action == "premium" and not value:
-        await showShopPremium(update)
-        return
-
-    if action == "premium" and value == "buy":
-        await showComingSoon(
-            update,
-            "Покупка премиума пока в разработке.",
-            "",
-            "shop:premium",
-        )
-        return
-
-    if action == "premium" and value == "info":
-        await showPremiumInfo(update)
-        return
-
-    if action == "promo":
-        await showComingSoon(
-            update,
-            "Промокод",
-            "Ввод промокодов пока в разработке.",
-            "shop:back",
-        )
-        return
-
-    await _answer_unavailable(update)
-
-
-async def handleSettingsCallback(update: Update, action: str, value: str) -> None:
-    if action == "back":
-        await showSettings(update)
-        return
-
-    if action == "profile" and not value:
-        await showSettingsProfile(update, _get_current_display_name(update))
-        return
-
-    if action == "profile" and value == "name":
-        _set_name_pending(update)
-        await showNamePrompt(update)
-        return
-
-    if action == "profile" and value == "bio":
-        titles = {
-            "bio": "Описание",
-        }
-        await showComingSoon(update, titles[value], "", "settings:profile")
-        return
-
-    if action == "notifications":
-        await showSettingsNotifications(update, _get_current_user_settings(update))
-        return
-
-    if action == "notif" and value == "news":
-        await _toggle_news_notifications(update)
-        return
-
-    if action == "notif" and value in {"lobby", "invites"}:
-        await showComingSoon(
-            update,
-            "Настройки уведомлений будут доступны позже.",
-            "",
-            "settings:notifications",
-        )
-        return
-
-    if action == "language":
-        await showSettingsLanguage(update)
-        return
-
-    if action == "lang" and value == "ru":
-        await showComingSoon(
-            update,
-            "Выбор языка будет доступен позже.",
-            "",
-            "settings:language",
-        )
-        return
-
-    if action == "name_later":
-        _clear_name_pending(update)
-        await showMainMenu(update)
-        return
-
-    if action == "safety" and not value:
-        await showSettingsSafety(update)
-        return
-
-    if action == "safety" and value in {"blacklist", "privacy", "reports"}:
-        titles = {
-            "blacklist": "Чёрный список",
-            "privacy": "Приватность профиля",
-            "reports": "Жалобы",
-        }
-        await showComingSoon(update, titles[value], "", "settings:safety")
-        return
-
-    await _answer_unavailable(update)
-
-
-async def handleSupportCallback(update: Update, action: str, value: str) -> None:
-    if action == "back":
-        await showSupport(update)
-        return
-
-    if action == "faq" and not value:
-        await showSupportFaq(update)
-        return
-
-    if action == "faq" and value in {"play", "lobby", "shop"}:
-        await showFaqAnswer(update, value)
-        return
-
-    if action == "bug":
-        await showComingSoon(
-            update,
-            "Сообщить об ошибке",
-            "Функция отправки баг-репортов пока в разработке.",
-            "support:back",
-        )
-        return
-
-    if action == "admin":
-        await showComingSoon(
-            update,
-            "Связаться с админом",
-            "Связь с администратором пока в разработке.",
-            "support:back",
-        )
-        return
-
-    if action == "rules":
-        await showRules(update)
-        return
-
-    await _answer_unavailable(update)
-
-
-async def _answer_unavailable(update: Update) -> None:
-    if update.callback_query is not None:
-        await update.callback_query.answer("Действие недоступно")
 
 
 def _set_name_pending(update: Update) -> None:
@@ -411,11 +280,10 @@ def _clear_name_pending(update: Update) -> None:
             raise
 
 
+def _menu_filter():
+    pattern = "^(?:" + "|".join(re.escape(button) for button in sorted(MENU_BUTTONS, key=len, reverse=True)) + ")$"
+    return filters.TEXT & ~filters.COMMAND & filters.Regex(pattern)
+
+
 def register_main_menu_handler(application) -> None:
-    application.add_handler(
-        CallbackQueryHandler(
-            callback_router,
-            pattern=r"^(menu|play|create|find|quick|lobby|noop|shop|settings|support):",
-        )
-    )
-    application.add_handler(CallbackQueryHandler(callback_router))
+    application.add_handler(MessageHandler(_menu_filter(), main_menu_reply_router))

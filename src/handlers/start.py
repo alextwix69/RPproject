@@ -17,7 +17,7 @@ from src.render.menu import showMainMenu
 from src.render.menu import showNamePrompt
 from src.services.user_service import ensure_from_effective_user
 from src.core.database import get_session
-from src.constants.callbacks import PENDING_SET_DISPLAY_NAME
+from src.constants.pending_actions import PENDING_SET_DISPLAY_NAME
 from src.services.chat_cleanup_service import clear_chat
 from src.services.user_state_service import set_pending_action
 

@@ -1,10 +1,10 @@
 """Уведомления участникам лобби."""
 
-from telegram import Bot, InlineKeyboardMarkup
+from telegram import Bot
 
 from src.core.database import get_session
 from src.core.logger import logger
-from src.keyboards.lobby_keyboard import get_active_lobby_keyboard, get_closed_lobby_keyboard
+from src.keyboards.lobby_keyboard import get_active_lobby_reply_keyboard, get_done_reply_keyboard
 from src.render.lobby_render import render_active_lobby_started
 from src.render.lobby_render import role_name
 from src.repositories import lobby_member_repo, lobby_repo
@@ -28,10 +28,9 @@ async def notify_lobby_started(bot: Bot, lobby_id: int) -> None:
             return
         recipients = lobby_member_repo.list_joined_users(session, lobby_id)
         text = render_active_lobby_started(lobby)
-        keyboard = get_active_lobby_keyboard(lobby.code)
 
-    for _member, user in recipients:
-        await _safe_send(bot, user.telegram_id, text, keyboard)
+    for member, user in recipients:
+        await _safe_send(bot, user.telegram_id, text, get_active_lobby_reply_keyboard(member.is_owner))
 
 
 async def notify_user_joined(bot: Bot, lobby_id: int, user_id: int) -> None:
@@ -77,7 +76,7 @@ async def notify_lobby_closed(bot: Bot, lobby_id: int, reason: str) -> None:
         recipients = lobby_member_repo.list_joined_users(session, lobby_id)
 
     text = f"🏁 Лобби закрыто.\n\nПричина: {REASON_TEXTS.get(reason, reason)}"
-    keyboard = get_closed_lobby_keyboard()
+    keyboard = get_done_reply_keyboard()
     for _member, user in recipients:
         await _safe_send(bot, user.telegram_id, text, keyboard)
 
@@ -93,7 +92,7 @@ async def _safe_send(
     bot: Bot,
     chat_id: int,
     text: str,
-    reply_markup: InlineKeyboardMarkup | None = None,
+    reply_markup=None,
 ) -> None:
     try:
         message = await bot.send_message(

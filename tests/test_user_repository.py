@@ -12,9 +12,12 @@ from src.services.user_service import toggle_news_notifications
 
 from src.repositories.user_repo import (
     get_by_telegram_id,
+    get_by_username,
     get_users_stats,
+    list_admin_users,
     list_news_notification_users,
     list_users,
+    set_role_by_telegram_id,
 )
 
 def make_effective_user(
@@ -146,6 +149,25 @@ def test_get_by_telegram_id_type():
     session.close()
 
 
+def test_get_by_username_finds_user_with_at_sign_case_insensitive():
+    session = make_session()
+    created_user = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=1, username="SomeUser"),
+    )
+    session.commit()
+
+    found_user = get_by_username(session, "@someuser")
+    found_without_at = get_by_username(session, "SOMEUSER")
+    missing_user = get_by_username(session, "@missing")
+
+    assert found_user.id == created_user.id
+    assert found_without_at.id == created_user.id
+    assert missing_user is None
+
+    session.close()
+
+
 def test_admin_user_list_and_stats():
     session = make_session()
 
@@ -208,6 +230,49 @@ def test_list_news_notification_users_returns_only_enabled_humans():
 
     assert [user.id for user in users] == [enabled_user.id]
     assert bot_user not in users
+
+    session.close()
+
+
+def test_set_role_by_telegram_id_changes_user_role():
+    session = make_session()
+    user = ensure_from_effective_user(session, make_effective_user(telegram_id=1))
+    session.commit()
+
+    updated_user = set_role_by_telegram_id(session, 1, "admin")
+    missing_user = set_role_by_telegram_id(session, 404, "admin")
+    session.commit()
+
+    assert updated_user.id == user.id
+    assert updated_user.role == "admin"
+    assert missing_user is None
+
+    session.close()
+
+
+def test_list_admin_users_returns_only_role_admin_humans():
+    session = make_session()
+    admin_user = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=1, username="admin"),
+    )
+    normal_user = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=2, username="normal"),
+    )
+    bot_admin = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=3, username="bot_admin", is_bot=True),
+    )
+    admin_user.role = "admin"
+    bot_admin.role = "admin"
+    session.commit()
+
+    users = list_admin_users(session)
+
+    assert [user.id for user in users] == [admin_user.id]
+    assert normal_user not in users
+    assert bot_admin not in users
 
     session.close()
 

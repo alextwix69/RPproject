@@ -33,6 +33,17 @@ def get_by_display_name(session: Session, display_name: str) -> User | None:
     return session.scalar(stmt)
 
 
+def get_by_username(session: Session, username: str) -> User | None:
+    """Ищет пользователя по Telegram username без @ и без учета регистра."""
+
+    normalized_username = username.removeprefix("@").strip()
+    if not normalized_username:
+        return None
+
+    stmt = select(User).where(func.lower(User.username) == normalized_username.lower())
+    return session.scalar(stmt)
+
+
 def get_by_id(session: Session, user_id: int) -> User | None:
     stmt = select(User).where(User.id == user_id)
     return session.scalar(stmt)
@@ -70,6 +81,33 @@ def list_news_notification_users(session: Session) -> list[User]:
         .order_by(User.id.asc())
     )
     return list(session.scalars(stmt).all())
+
+
+def list_admin_users(session: Session) -> list[User]:
+    """Возвращает пользователей с ролью admin."""
+
+    stmt = (
+        select(User)
+        .where(User.role == "admin")
+        .where(User.is_bot.is_(False))
+        .order_by(User.id.asc())
+    )
+    return list(session.scalars(stmt).all())
+
+
+def set_role_by_telegram_id(
+    session: Session,
+    telegram_id: int,
+    role: str,
+) -> User | None:
+    """Меняет роль пользователя по Telegram ID."""
+
+    user = get_by_telegram_id(session, telegram_id)
+    if user is None:
+        return None
+
+    user.role = role
+    return user
 
 
 def get_users_stats(session: Session) -> dict[str, int]:

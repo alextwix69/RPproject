@@ -1,31 +1,44 @@
+import re
+
 from src.core.logger import logger
 from telegram import Update
 from telegram.ext import (
-    CallbackQueryHandler,
     CommandHandler,
-    ContextTypes
+    ContextTypes,
+    MessageHandler,
+    filters,
 )
 
-from src.keyboards.kb_build import build_admin_panel
-from src.core.config import get_admin_ids
+from src.core.database import get_session
+from src.keyboards.kb_build import BTN_ADMIN_NOTIFY, BTN_ADMIN_RIGHTS, build_admin_panel
 from src.handlers.admin_handlers.users import register_admin_users_handlers
-from src.services.chat_cleanup_service import remember_telegram_message, reply_text
+from src.repositories.user_repo import get_by_telegram_id, get_by_username
+from src.services.admin_service import (
+    grant_admin_role,
+    is_admin_effective_user,
+    is_owner_effective_user,
+    revoke_admin_role,
+)
+from src.services.chat_cleanup_service import reply_text
 from src.services.news_notification_service import send_news_notification
 
 ADMIN_MESSAGE = (
     "Админ-панель\n\n"
-    "Команды:\n"
+    "Команды для админов из БД:\n"
     "/users - последние пользователи\n"
     "/user <telegram_id> - карточка пользователя\n"
     "/stats - статистика\n"
     "/export_users - экспорт CSV\n"
-    "/notify <текст> - новостная рассылка"
+    "/notify <текст> - новостная рассылка\n\n"
+    "Команды только для владельцев из OWNER_IDS:\n"
+    "/makeadmin <telegram_id|@username> - выдать админские права (только владельцы)\n"
+    "/removeadmin <telegram_id|@username> - забрать админские права (только владельцы)"
 )
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("admin()")
 
-    if update.effective_user is None or update.effective_user.id not in get_admin_ids():
+    if not is_admin_effective_user(update.effective_user):
         return
 
     await reply_text(
@@ -35,35 +48,44 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-
-    if query is None:
+async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.message.text is None:
         return
 
-    if update.effective_user is None or update.effective_user.id not in get_admin_ids():
-        await query.answer("Нет доступа", show_alert=True)
+    if not is_admin_effective_user(update.effective_user):
         return
 
-    await query.answer()
-    if query.data == "admin:notify":
-        sent_message = await query.edit_message_text(
+    text = update.message.text.strip()
+    if text == BTN_ADMIN_NOTIFY:
+        await reply_text(
+            update.message,
             "Новостная рассылка\n\n"
             "Отправь команду:\n"
             "/notify текст новости",
             reply_markup=build_admin_panel(),
         )
-        if sent_message is not True:
-            remember_telegram_message(sent_message, is_active_screen=True)
         return
 
-    sent_message = await query.edit_message_text("Админ-действие пока не настроено.")
-    if sent_message is not True:
-        remember_telegram_message(sent_message, is_active_screen=True)
+    if text == BTN_ADMIN_RIGHTS:
+        await reply_text(
+            update.message,
+            "Права админов\n\n"
+            "Доступы:\n"
+            "• /admin, /users, /user, /stats, /export_users, /notify — админы из БД\n"
+            "• /makeadmin, /removeadmin — только владельцы из OWNER_IDS\n\n"
+            "Выдать права:\n"
+            "/makeadmin <telegram_id|@username>\n\n"
+            "Забрать права:\n"
+            "/removeadmin <telegram_id|@username>",
+            reply_markup=build_admin_panel(),
+        )
+        return
+
+    await reply_text(update.message, "Админ-действие пока не настроено.", reply_markup=build_admin_panel())
 
 
 async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_user is None or update.effective_user.id not in get_admin_ids():
+    if not is_admin_effective_user(update.effective_user):
         return
 
     if update.message is None:
@@ -80,8 +102,88 @@ async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await send_news_notification(update.get_bot(), text)
 
 
+def _get_target_argument(context: ContextTypes.DEFAULT_TYPE) -> str | None:
+    if not context.args:
+        return None
+
+    return context.args[0].strip()
+
+
+def _resolve_target_telegram_id(raw_target: str | None) -> int | None:
+    if not raw_target:
+        return None
+
+    if raw_target.startswith("@"):
+        with get_session() as session:
+            user = get_by_username(session, raw_target)
+            return user.telegram_id if user is not None else None
+
+    try:
+        telegram_id = int(raw_target)
+    except ValueError:
+        return None
+
+    with get_session() as session:
+        user = get_by_telegram_id(session, telegram_id)
+        return user.telegram_id if user is not None else None
+
+
+def _target_usage(command: str) -> str:
+    return f"Использование: /{command} <telegram_id|@username>"
+
+
+async def makeadmin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_owner_effective_user(update.effective_user):
+        return
+
+    if update.message is None:
+        return
+
+    raw_target = _get_target_argument(context)
+    telegram_id = _resolve_target_telegram_id(raw_target)
+    if telegram_id is None:
+        await reply_text(update.message, _target_usage("makeadmin"))
+        return
+
+    user = grant_admin_role(telegram_id)
+    if user is None:
+        await reply_text(update.message, "Пользователь с таким Telegram ID не найден в базе.")
+        return
+
+    await reply_text(update.message, f"Готово. Пользователь {telegram_id} теперь admin.")
+
+
+async def removeadmin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_owner_effective_user(update.effective_user):
+        return
+
+    if update.message is None:
+        return
+
+    raw_target = _get_target_argument(context)
+    telegram_id = _resolve_target_telegram_id(raw_target)
+    if telegram_id is None:
+        await reply_text(update.message, _target_usage("removeadmin"))
+        return
+
+    user = revoke_admin_role(telegram_id)
+    if user is None:
+        await reply_text(update.message, "Пользователь с таким Telegram ID не найден в базе.")
+        return
+
+    await reply_text(update.message, f"Готово. Пользователь {telegram_id} теперь user.")
+
+
 def register_admin_handler(application) -> None:
     application.add_handler(CommandHandler("admin", admin))
     application.add_handler(CommandHandler("notify", notify_command))
+    application.add_handler(CommandHandler("makeadmin", makeadmin_command))
+    application.add_handler(CommandHandler("removeadmin", removeadmin_command))
     register_admin_users_handlers(application)
-    application.add_handler(CallbackQueryHandler(admin_callback, pattern=r"^admin:"))
+    application.add_handler(MessageHandler(_admin_filter(), admin_reply_handler))
+
+
+def _admin_filter():
+    buttons = {BTN_ADMIN_NOTIFY, BTN_ADMIN_RIGHTS}
+    pattern = "^(?:" + "|".join(re.escape(button) for button in buttons) + ")$"
+    return filters.TEXT & ~filters.COMMAND & filters.Regex(pattern)

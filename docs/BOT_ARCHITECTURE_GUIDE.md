@@ -5,12 +5,13 @@
 Актуальное состояние проекта:
 
 - стек: `python-telegram-bot`, SQLAlchemy, SQLite по умолчанию;
-- основной UX построен на inline-кнопках;
+- UX построен на нижних reply-клавиатурах пользователя;
 - lobby-механика реализована как сущности в базе данных, а не как Telegram-группы;
 - режим лобби сейчас только RP;
 - максимальный размер каждого нового лобби фиксированный: `15` участников;
 - роли в RP уникальны внутри одного лобби;
-- общение участников идёт через личный чат с ботом.
+- общение участников идёт через личный чат с ботом;
+- кнопка выхода не показывается в reply-клавиатуре, но команда `/leave` выходит из текущего лобби.
 
 ## Быстрая Карта
 
@@ -21,10 +22,10 @@ src/
 ├── models/                        # SQLAlchemy-модели
 ├── repositories/                  # SQL-запросы и работа с таблицами
 ├── services/                      # бизнес-логика
-├── handlers/                      # Telegram handlers и callback routing
-├── keyboards/                     # inline-клавиатуры
+├── handlers/                      # Telegram handlers и reply routing
+├── keyboards/                     # reply-клавиатуры
 ├── render/                        # тексты экранов
-├── constants/                     # темы, роли, callback-state
+├── constants/                     # темы, роли, pending-action состояния
 └── utils/                         # маленькие утилиты
 ```
 
@@ -56,8 +57,8 @@ Handlers принимают Telegram-события. Services принимают
 - подключает handlers:
   - `/start`;
   - админку;
-  - callback-router главного меню;
-  - lobby message handler и `/leave`;
+  - reply-router главного меню;
+  - lobby message handler;
 - подключает `post_init(start_lobby_background_tasks)`, чтобы стартовать фоновую очистку истёкших лобби;
 - запускает polling в `main()`.
 
@@ -73,9 +74,13 @@ Handlers принимают Telegram-события. Services принимают
 
 - получить Telegram API key;
 - получить URL базы данных;
-- получить список admin ids.
+- получить список owner ids.
 
 Этот файл не должен содержать бизнес-логику. Его задача - отдать конфиг другим модулям.
+
+`OWNER_IDS` из `.env` используется как доступ владельцев для выдачи и снятия админских прав.
+Админские права хранятся в БД через `users.role = "admin"`.
+Команды `/makeadmin` и `/removeadmin` принимают Telegram ID или `@username` уже известного боту пользователя.
 
 ### `src/core/database.py`
 
@@ -146,6 +151,7 @@ Handlers принимают Telegram-события. Services принимают
 - `create_state` хранит временное состояние создания лобби.
 - `display_name` хранит уникальное имя профиля RoleHub, привязанное к Telegram ID.
 - `news_notifications_enabled` управляет получением новостных рассылок `/notify`.
+- `role` используется для админских прав: `admin` получает доступ к админ-командам.
 
 ### `src/models/chat_message.py`
 
@@ -252,7 +258,7 @@ Roblox удалён из актуального пользовательског
 - оригинальному латинскому имени;
 - slug.
 
-### `src/constants/callbacks.py`
+### `src/constants/pending_actions.py`
 
 Содержит строковые константы pending-state:
 
@@ -303,7 +309,7 @@ Repositories должны быть тонким SQL-слоем. Они не ре
 Используется:
 
 - `/start`;
-- callback-router;
+- reply-router;
 - админка;
 - lobby handlers.
 
@@ -493,10 +499,11 @@ Handlers принимают Telegram update и решают, какой service 
 Что делает:
 
 - команда `/admin`;
-- проверяет `effective_user.id` против `get_admin_ids()`;
+- проверяет админские права по `users.role = "admin"` в БД;
 - показывает админ-панель;
 - подключает `register_admin_users_handlers()`;
-- содержит базовый callback-handler для `admin:*`.
+- содержит reply-кнопки админ-панели.
+- команды `/makeadmin` и `/removeadmin` доступны только владельцам из `OWNER_IDS`.
 
 ### `src/handlers/admin_handlers/users.py`
 
@@ -508,46 +515,29 @@ Handlers принимают Telegram update и решают, какой service 
 - `/user <telegram_id>`;
 - `/stats`;
 - `/export_users`;
-- callback-пагинация пользователей.
+- reply-кнопки админ-панели.
 
 Использует `user_repo` для чтения пользователей и статистики.
 
 ### `src/handlers/main_menu.py`
 
-Центральный callback-router.
+Центральный reply-router общего меню.
 
 Главная функция:
 
-- `callback_router(update, context)`.
+- `main_menu_reply_router(update, context)`.
 
-Она разбирает `callback_data` по схеме:
+Она обрабатывает точные тексты reply-кнопок:
 
 ```text
-section:action:value:extra
+🎮 Играть
+🛍 Магазин
+⚙️ Настройки
+🆘 Поддержка
 ```
 
-Поддерживаемые namespaces:
-
-- `menu`;
-- `play`;
-- `create`;
-- `find`;
-- `quick`;
-- `lobby`;
-- `noop`;
-- `shop`;
-- `settings`;
-- `support`.
-
-Перед обработкой callback всегда вызывает `_ensure_callback_user()`, чтобы пользователь был в БД.
-
-Lobby namespaces делегируются в `src/handlers/play_lobby.py`:
-
-- `create:*` -> `handle_create_callback()`;
-- `find:*` -> `handle_find_callback()`;
-- `quick:*` -> `handle_quick_callback()`;
-- `lobby:*` -> `handle_lobby_callback()`;
-- часть `play:*` -> `handle_lobby_play_callback()`.
+Перед обработкой кнопки router создаёт или обновляет пользователя в БД.
+Игровая кнопка `🎮 Играть` делегируется в `src/handlers/play_lobby.py`.
 
 Остальные разделы, например shop/settings/support, сейчас в основном показывают заглушки.
 
@@ -557,22 +547,16 @@ Lobby namespaces делегируются в `src/handlers/play_lobby.py`:
 
 Здесь находятся:
 
-- callback handlers для play/create/find/quick/lobby;
+- обработчик нижних reply-кнопок игрового сценария;
 - обработчик обычных сообщений в активном лобби;
-- команда `/leave`;
 - обработчик ввода кода лобби;
 - обработчик поиска роли сообщением;
 - фоновая очистка истёкших лобби.
 
 Основные функции:
 
-- `handle_play_callback()`;
-- `handle_create_callback()`;
-- `handle_find_callback()`;
-- `handle_quick_callback()`;
-- `handle_lobby_callback()`;
+- `show_play_menu()`;
 - `lobby_message_handler()`;
-- `leave_command()`;
 - `close_expired_lobbies_for_bot()`;
 - `register_lobby_message_handler()`.
 
@@ -583,9 +567,9 @@ Lobby namespaces делегируются в `src/handlers/play_lobby.py`:
 ```text
 Играть
   -> Создать лобби
+  -> выбрать приватность
   -> выбрать тему
   -> выбрать роль
-  -> выбрать приватность
   -> подтверждение
   -> create_lobby()
   -> экран ожидания
@@ -600,7 +584,8 @@ Lobby namespaces делегируются в `src/handlers/play_lobby.py`:
 ```text
 Играть
   -> Найти лобби
-  -> выбрать тему
+  -> выбрать способ: код или тема
+  -> выбрать тему или ввести код
   -> find_available_lobby()
   -> найденное лобби
   -> Войти
@@ -639,7 +624,7 @@ Lobby namespaces делегируются в `src/handlers/play_lobby.py`:
 Для создания:
 
 ```text
-create:role_search
+кнопка `🔎 Найти роль` при создании
   -> pending_action = search_create_role
   -> следующее текстовое сообщение ищет роль
 ```
@@ -647,7 +632,7 @@ create:role_search
 Для входа:
 
 ```text
-lobby:role_search:{code}
+кнопка `🔎 Найти роль` при входе в лобби
   -> pending_action = search_join_role:{code}
   -> следующее текстовое сообщение ищет свободную роль
 ```
@@ -672,24 +657,12 @@ lobby:role_search:{code}
 5. сохранить сообщение;
 6. разослать всем другим joined-участникам.
 
-#### `/leave`
+#### Выход из лобби
 
-Команда `/leave` вызывает ту же логику, что и кнопка выхода.
+Кнопка выхода не показывается в пользовательских клавиатурах.
+Команда `/leave` вызывает выход из текущего лобби.
 
 ## Keyboards Слой
-
-### `src/keyboards/inline_buttons.py`
-
-Старые и общие inline callback-data для главного меню, магазина, настроек, поддержки.
-
-Содержит:
-
-- основные callback constants;
-- `MAIN_MENU_BUTTONS`;
-- `PLAY_TOPICS_BUTTONS`;
-- кнопки shop/settings/support.
-
-Часть play-механики уже переехала в `lobby_keyboard.py`, но старые helper-функции и тесты ещё используют некоторые структуры отсюда.
 
 ### `src/keyboards/kb_build.py`
 
@@ -697,10 +670,8 @@ lobby:role_search:{code}
 
 Ключевые функции:
 
-- `_build_inline_keyboard()`;
+- `_build_reply_keyboard()`;
 - `getMainMenuKeyboard()`;
-- `getPlayTopicsKeyboard()`;
-- `getTopicActionsKeyboard()`;
 - shop/settings/support keyboards;
 - `getBackToMenuKeyboard()`;
 - `build_admin_panel()`.
@@ -711,19 +682,11 @@ lobby:role_search:{code}
 
 Ключевые функции:
 
-- `get_play_main_keyboard()`;
-- `get_topic_keyboard()`;
-- `get_create_role_keyboard()`;
-- `get_create_privacy_keyboard()`;
-- `get_create_confirm_keyboard()`;
-- `get_lobby_waiting_keyboard()`;
-- `get_found_lobby_keyboard()`;
-- `get_join_role_keyboard()`;
-- `get_role_search_results_keyboard()`;
-- `get_role_search_prompt_keyboard()`;
-- `get_active_lobby_keyboard()`;
-- `get_lobby_info_keyboard()`;
-- `get_lobby_members_keyboard()`;
+- `get_play_main_reply_keyboard()`;
+- `get_find_main_reply_keyboard()`;
+- `get_topic_reply_keyboard()`;
+- `get_active_lobby_reply_keyboard()` без `/leave`, с кнопками комнаты;
+- `get_remove_lobby_reply_keyboard()`;
 - error/fallback keyboards.
 
 Здесь же живёт пагинация ролей:
@@ -754,7 +717,7 @@ Render-файлы собирают тексты экранов. Они не до
 - `showFaqAnswer()`;
 - `showRules()`.
 
-`_render()` важен: если update пришёл из callback, он пытается сделать `edit_message_text`; если из обычного сообщения, делает `reply_text`.
+`_render()` отправляет новый активный экран через `reply_text` и прикладывает reply-клавиатуру.
 
 ### `src/render/lobby_render.py`
 
@@ -779,56 +742,28 @@ Render-файлы собирают тексты экранов. Они не до
 - `render_no_lobby()`;
 - `render_quick_no_lobby()`.
 
-## Callback Data Карта
+## Reply-Кнопки
 
-Основная схема:
-
-```text
-section:action:value:extra
-```
-
-Примеры:
-
-```text
-menu:main
-menu:play
-play:create
-create:topic:mlp
-create:role:twilight_sparkle
-create:privacy:public
-create:confirm
-find:topic:brawl_stars
-find:next:mlp:ABC123
-quick:topic:mlp
-lobby:join:ABC123
-lobby:role:ABC123:rainbow_dash
-lobby:refresh:ABC123
-lobby:start:ABC123
-lobby:leave:ABC123
-lobby:members:ABC123
-lobby:info:ABC123
-lobby:close:ABC123
-noop:page
-```
+Все пользовательские и админские меню используют нижнюю reply-клавиатуру Telegram.
+Кнопки обрабатываются как точный текст входящего сообщения.
 
 ## Основные Сценарии
 
 ### Создать лобби
 
 ```text
-User presses menu:play
-  -> showPlayTopics()
-  -> play:create
-  -> _show_create_topic()
-  -> create:topic:{topic}
+Пользователь нажимает `🎮 Играть`
+  -> render_play_main() + нижняя reply-клавиатура
+  -> `➕ Создать лобби`
+  -> _show_create_privacy()
+  -> выбрать тип лобби
+  -> выбрать тему
   -> save create_state(topic, mode=rp)
   -> render_create_role()
-  -> create:role:{role}
+  -> выбрать роль reply-кнопкой
   -> save create_state(role, max_players=15)
-  -> render_create_privacy()
-  -> create:privacy:{privacy}
   -> render_create_confirm()
-  -> create:confirm
+  -> `🚀 Создать лобби`
   -> lobby_service.create_lobby()
   -> render_lobby_waiting()
 ```
@@ -836,13 +771,15 @@ User presses menu:play
 ### Найти и войти
 
 ```text
-play:find
-  -> find:topic:{topic}
+`🎮 Играть`
+  -> `🔎 Найти лобби`
+  -> выбрать способ поиска
+  -> выбрать тему или отправить код текстом
   -> matchmaking_service.find_available_lobby()
   -> render_found_lobby()
-  -> lobby:join:{code}
+  -> `✅ Войти`
   -> render_join_role()
-  -> lobby:role:{code}:{role}
+  -> выбрать роль reply-кнопкой
   -> lobby_service.join_lobby()
   -> render_lobby_waiting()
 ```
@@ -850,7 +787,7 @@ play:find
 ### Активировать лобби
 
 ```text
-lobby:start:{code}
+`▶️ Запустить`
   -> lobby_service.start_lobby()
   -> status = active
   -> expires_at = now + 2 hours
@@ -875,15 +812,9 @@ message text/photo/sticker/voice
 ### Выйти
 
 ```text
-lobby:leave:{code}
-или /leave
-  -> lobby_service.leave_lobby()
-  -> member.status = left
-  -> user.current_lobby_id = null
-  -> players_count -= 1
-  -> если owner вышел, передать owner
-  -> если players_count == 0, close lobby
-  -> notify_user_left()
+Сценарий временно отключён.
+Игровые клавиатуры не показывают кнопку выхода.
+Команда /leave регистрируется в Application и выходит из текущего лобби.
 ```
 
 ### Очистка истёкших лобби
@@ -905,8 +836,8 @@ start_lobby_background_tasks()
 
 ### Если нужна новая кнопка
 
-1. Добавить callback-data в нужную клавиатуру.
-2. Добавить обработку namespace/action в handler.
+1. Добавить текст кнопки в нужную reply-клавиатуру.
+2. Добавить обработку текста кнопки в handler.
 3. Если нужен текст экрана, добавить функцию в render.
 4. Если есть бизнес-правило, добавить его в service.
 
@@ -937,14 +868,13 @@ play_lobby.py handler
 
 ## Тесты
 
-### `tests/test_main_menu_callbacks.py`
+### `tests/test_reply_keyboards.py`
 
 Проверяет:
 
-- распознавание callback главного меню;
-- тексты intents;
-- callback-data главных клавиатур;
-- admin panel callbacks.
+- состав reply-клавиатуры главного меню;
+- состав reply-клавиатуры админ-панели;
+- кнопки активной комнаты без `/leave`.
 
 ### `tests/test_user_repository.py`
 
@@ -959,7 +889,7 @@ play_lobby.py handler
 
 ### `tests/conftest.py`
 
-Сейчас содержит тест для `get_admin_ids()`.
+Сейчас содержит тест для `get_owner_ids()`.
 
 ### `tests/test_registration.py`, `tests/test_start.py`
 

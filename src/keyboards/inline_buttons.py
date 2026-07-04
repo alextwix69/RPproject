@@ -70,7 +70,6 @@ SETTINGS_BUTTONS = [
 SETTINGS_PROFILE_BUTTONS = [
     [("✏️ Имя", "settings:profile:name")],
     [("📝 Описание", "settings:profile:bio")],
-    [("🎭 Роль по умолчанию", "settings:profile:role")],
     [("⬅️ Назад", "settings:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
 ]
 
@@ -83,8 +82,12 @@ SETTINGS_NOTIFICATIONS_BUTTONS = [
 
 SETTINGS_LANGUAGE_BUTTONS = [
     [("🇷🇺 Русский", "settings:lang:ru")],
-    [("🇬🇧 English", "settings:lang:en")],
     [("⬅️ Назад", "settings:back"), ("🏠 Меню", MENU_MAIN_CALLBACK)],
+]
+
+NAME_PROMPT_BUTTONS = [
+    [("⏭ Позже", "settings:name_later")],
+    [("🏠 Главное меню", MENU_MAIN_CALLBACK)],
 ]
 
 SETTINGS_SAFETY_BUTTONS = [

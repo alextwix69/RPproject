@@ -90,4 +90,5 @@ def test_admin_panel_uses_expected_callbacks():
         "admin:users",
         "admin:stats",
         "admin:export_users",
+        "admin:notify",
     ]

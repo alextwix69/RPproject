@@ -31,11 +31,22 @@ class User(Base):
     first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     language_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(
+        String(32),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
 
     # Служебные поля приложения.
     # role нужен для прав доступа, is_registered показывает прохождение регистрации.
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[str] = mapped_column(String(50), default="user")
+    news_notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
     # Показывает, прошел ли пользователь регистрацию в боте.
     is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
     current_lobby_id: Mapped[int | None] = mapped_column(nullable=True, index=True)

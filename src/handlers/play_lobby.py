@@ -11,6 +11,7 @@ from src.constants.callbacks import (
     PENDING_CREATE_ROLE_SEARCH,
     PENDING_ENTER_LOBBY_CODE,
     PENDING_JOIN_ROLE_SEARCH_PREFIX,
+    PENDING_SET_DISPLAY_NAME,
 )
 from src.constants.roles import ROLES_BY_TOPIC, search_roles
 from src.constants.topics import TOPICS
@@ -52,7 +53,7 @@ from src.render.lobby_render import (
     render_quick_no_lobby,
     role_name,
 )
-from src.render.menu import _render
+from src.render.menu import _render, showMainMenu
 from src.repositories import lobby_member_repo, lobby_repo
 from src.services import lobby_message_service
 from src.services.lobby_service import (
@@ -71,7 +72,8 @@ from src.services.notification_service import (
     notify_user_joined,
     notify_user_left,
 )
-from src.services.user_service import ensure_from_effective_user
+from src.services.chat_cleanup_service import remember_telegram_message, reply_text
+from src.services.user_service import DisplayNameError, ensure_from_effective_user, set_display_name
 from src.services.user_state_service import (
     clear_create_state,
     clear_pending_action,
@@ -313,6 +315,9 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     with get_session() as session:
         try:
             user = _ensure_user(session, update)
+            if user.pending_action == PENDING_SET_DISPLAY_NAME:
+                await _handle_display_name_message(update, session, user)
+                return
             if user.pending_action == PENDING_CREATE_ROLE_SEARCH:
                 await _handle_create_role_search_message(update, session, user)
                 return
@@ -322,7 +327,7 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
             if user.pending_action == PENDING_ENTER_LOBBY_CODE:
                 code = (update.message.text or "").replace(" ", "").upper()
                 if not code:
-                    await update.message.reply_text("Отправь код лобби текстом.")
+                    await reply_text(update.message, "Отправь код лобби текстом.")
                     session.commit()
                     return
                 try:
@@ -334,7 +339,8 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
                         taken_roles = lobby_member_repo.list_taken_roles(session, lobby.id)
                         clear_pending_action(user)
                         session.commit()
-                        await update.message.reply_text(
+                        await reply_text(
+                            update.message,
                             render_join_role(lobby),
                             reply_markup=get_join_role_keyboard(lobby.code, lobby.topic, taken_roles),
                         )
@@ -349,15 +355,17 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
                 except LobbyError as exc:
                     session.rollback()
                     if exc.code == "not_found":
-                        await update.message.reply_text(
+                        await reply_text(
+                            update.message,
                             "❌ Лобби с таким кодом не найдено.",
                             reply_markup=get_invalid_code_keyboard(),
                         )
                     else:
-                        await update.message.reply_text(exc.message)
+                        await reply_text(update.message, exc.message)
                     return
 
-                await update.message.reply_text(
+                await reply_text(
+                    update.message,
                     render_active_lobby_started(lobby) if auto_start else render_lobby_waiting(lobby),
                     reply_markup=get_active_lobby_keyboard(lobby.code)
                     if auto_start
@@ -370,17 +378,17 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
             if user.current_lobby_id is None:
                 session.commit()
-                await update.message.reply_text("Ты сейчас не находишься в активном лобби.")
+                await reply_text(update.message, "Ты сейчас не находишься в активном лобби.")
                 return
             lobby = lobby_repo.get_by_id(session, user.current_lobby_id)
             if lobby is None or lobby.status == "closed":
                 user.current_lobby_id = None
                 session.commit()
-                await update.message.reply_text("Это лобби уже закрыто.")
+                await reply_text(update.message, "Это лобби уже закрыто.")
                 return
             if lobby.status != "active":
                 session.commit()
-                await update.message.reply_text("Лобби ещё не активно. Дождись запуска.")
+                await reply_text(update.message, "Лобби ещё не активно. Дождись запуска.")
                 return
             payload = lobby_message_service.payload_from_telegram_message(update.message)
             if payload is None:
@@ -392,7 +400,7 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception:
             session.rollback()
             logger.exception("Lobby message handler failed")
-            await update.message.reply_text("Не удалось обработать сообщение.")
+            await reply_text(update.message, "Не удалось обработать сообщение.")
             return
 
     await lobby_message_service.send_message_to_lobby(update.get_bot(), lobby_id, sender_id, payload)
@@ -761,13 +769,15 @@ async def _handle_create_role_search_message(update: Update, session, user) -> N
     session.commit()
 
     if not results:
-        await update.message.reply_text(
+        await reply_text(
+            update.message,
             "Роль не найдена. Напиши другое имя или часть имени.",
             reply_markup=get_role_search_prompt_keyboard("create:role_search"),
         )
         return
 
-    await update.message.reply_text(
+    await reply_text(
+        update.message,
         "Нашёл роли. Выбери нужную:",
         reply_markup=get_role_search_results_keyboard(
             "create:role",
@@ -777,6 +787,25 @@ async def _handle_create_role_search_message(update: Update, session, user) -> N
     )
 
 
+async def _handle_display_name_message(update: Update, session, user) -> None:
+    if update.message.text is None:
+        await reply_text(update.message, "Напиши имя текстом.")
+        session.commit()
+        return
+
+    try:
+        set_display_name(session, user, update.message.text)
+        clear_pending_action(user)
+        session.commit()
+    except DisplayNameError as exc:
+        session.commit()
+        await reply_text(update.message, f"{exc.message}\n\nПопробуй ещё раз.")
+        return
+
+    await reply_text(update.message, f"Готово, теперь твоё имя: {user.display_name}.")
+    await showMainMenu(update)
+
+
 async def _handle_join_role_search_message(update: Update, session, user) -> None:
     query = (update.message.text or "").strip()
     code = user.pending_action.removeprefix(PENDING_JOIN_ROLE_SEARCH_PREFIX)
@@ -784,7 +813,7 @@ async def _handle_join_role_search_message(update: Update, session, user) -> Non
     if lobby is None:
         clear_pending_action(user)
         session.commit()
-        await update.message.reply_text("Лобби не найдено.", reply_markup=get_play_main_keyboard())
+        await reply_text(update.message, "Лобби не найдено.", reply_markup=get_play_main_keyboard())
         return
 
     try:
@@ -792,7 +821,7 @@ async def _handle_join_role_search_message(update: Update, session, user) -> Non
     except LobbyError as exc:
         clear_pending_action(user)
         session.commit()
-        await update.message.reply_text(exc.message, reply_markup=get_play_main_keyboard())
+        await reply_text(update.message, exc.message, reply_markup=get_play_main_keyboard())
         return
 
     taken_roles = lobby_member_repo.list_taken_roles(session, lobby.id)
@@ -800,13 +829,15 @@ async def _handle_join_role_search_message(update: Update, session, user) -> Non
     session.commit()
 
     if not results:
-        await update.message.reply_text(
+        await reply_text(
+            update.message,
             "Роль не найдена или уже занята. Напиши другое имя или часть имени.",
             reply_markup=get_role_search_prompt_keyboard(f"lobby:role_search:{code}"),
         )
         return
 
-    await update.message.reply_text(
+    await reply_text(
+        update.message,
         "Нашёл свободные роли. Выбери нужную:",
         reply_markup=get_role_search_results_keyboard(
             f"lobby:role:{code}",
@@ -877,11 +908,15 @@ async def _answer_role_selected(
     )
 
     if update.effective_chat is not None:
-        await update.get_bot().send_message(chat_id=update.effective_chat.id, text=text)
+        sent_message = await update.get_bot().send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
+        )
+        remember_telegram_message(sent_message)
         return
 
     if update.message is not None:
-        await update.message.reply_text(text)
+        await reply_text(update.message, text)
 
 
 def _safe_page(value: str) -> int:

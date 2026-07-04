@@ -29,6 +29,7 @@ def build_admin_panel() -> InlineKeyboardMarkup:
         [
             [("Пользователи", "admin:users")],
             [("Статистика", "admin:stats"), ("Экспорт CSV", "admin:export_users")],
+            [("Новостная рассылка", "admin:notify")],
         ]
     )
 
@@ -77,7 +78,19 @@ def getSettingsProfileKeyboard() -> InlineKeyboardMarkup:
 
 
 def getSettingsNotificationsKeyboard(userSettings=None) -> InlineKeyboardMarkup:
-    return _build_inline_keyboard(buttons.SETTINGS_NOTIFICATIONS_BUTTONS)
+    news_enabled = True
+    if userSettings is not None:
+        news_enabled = bool(getattr(userSettings, "news_notifications_enabled", True))
+
+    news_label = "✅ Новости: Вкл" if news_enabled else "❌ Новости: Выкл"
+    return _build_inline_keyboard(
+        [
+            [("✅ Лобби: Вкл", "settings:notif:lobby")],
+            [("✅ Приглашения: Вкл", "settings:notif:invites")],
+            [(news_label, "settings:notif:news")],
+            [("⬅️ Назад", "settings:back"), ("🏠 Меню", buttons.MENU_MAIN_CALLBACK)],
+        ]
+    )
 
 
 def getSettingsLanguageKeyboard() -> InlineKeyboardMarkup:
@@ -86,6 +99,10 @@ def getSettingsLanguageKeyboard() -> InlineKeyboardMarkup:
 
 def getSettingsSafetyKeyboard() -> InlineKeyboardMarkup:
     return _build_inline_keyboard(buttons.SETTINGS_SAFETY_BUTTONS)
+
+
+def getNamePromptKeyboard() -> InlineKeyboardMarkup:
+    return _build_inline_keyboard(buttons.NAME_PROMPT_BUTTONS)
 
 
 def getSupportKeyboard() -> InlineKeyboardMarkup:

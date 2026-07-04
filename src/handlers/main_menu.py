@@ -9,6 +9,7 @@ from src.render.menu import (
     showComingSoon,
     showFaqAnswer,
     showMainMenu,
+    showNamePrompt,
     showPlayTopics,
     showPremiumInfo,
     showRules,
@@ -25,6 +26,7 @@ from src.render.menu import (
     showSupportFaq,
     showTopicActions,
 )
+from src.constants.callbacks import PENDING_SET_DISPLAY_NAME
 from src.handlers.play_lobby import (
     handle_create_callback,
     handle_find_callback,
@@ -32,7 +34,8 @@ from src.handlers.play_lobby import (
     handle_play_callback as handle_lobby_play_callback,
     handle_quick_callback,
 )
-from src.services.user_service import ensure_from_effective_user
+from src.services.user_service import ensure_from_effective_user, toggle_news_notifications
+from src.services.user_state_service import clear_pending_action, set_pending_action
 
 
 async def _ensure_callback_user(update: Update) -> None:
@@ -116,6 +119,7 @@ async def callback_router(
 
 async def handleMainMenuCallback(update: Update, action: str) -> None:
     if action == "main":
+        _clear_name_pending(update)
         await showMainMenu(update)
         return
 
@@ -246,23 +250,30 @@ async def handleSettingsCallback(update: Update, action: str, value: str) -> Non
         return
 
     if action == "profile" and not value:
-        await showSettingsProfile(update)
+        await showSettingsProfile(update, _get_current_display_name(update))
         return
 
-    if action == "profile" and value in {"name", "bio", "role"}:
+    if action == "profile" and value == "name":
+        _set_name_pending(update)
+        await showNamePrompt(update)
+        return
+
+    if action == "profile" and value == "bio":
         titles = {
-            "name": "Имя",
             "bio": "Описание",
-            "role": "Роль по умолчанию",
         }
         await showComingSoon(update, titles[value], "", "settings:profile")
         return
 
     if action == "notifications":
-        await showSettingsNotifications(update)
+        await showSettingsNotifications(update, _get_current_user_settings(update))
         return
 
-    if action == "notif" and value in {"lobby", "invites", "news"}:
+    if action == "notif" and value == "news":
+        await _toggle_news_notifications(update)
+        return
+
+    if action == "notif" and value in {"lobby", "invites"}:
         await showComingSoon(
             update,
             "Настройки уведомлений будут доступны позже.",
@@ -275,13 +286,18 @@ async def handleSettingsCallback(update: Update, action: str, value: str) -> Non
         await showSettingsLanguage(update)
         return
 
-    if action == "lang" and value in {"ru", "en"}:
+    if action == "lang" and value == "ru":
         await showComingSoon(
             update,
             "Выбор языка будет доступен позже.",
             "",
             "settings:language",
         )
+        return
+
+    if action == "name_later":
+        _clear_name_pending(update)
+        await showMainMenu(update)
         return
 
     if action == "safety" and not value:
@@ -341,6 +357,58 @@ async def handleSupportCallback(update: Update, action: str, value: str) -> None
 async def _answer_unavailable(update: Update) -> None:
     if update.callback_query is not None:
         await update.callback_query.answer("Действие недоступно")
+
+
+def _set_name_pending(update: Update) -> None:
+    with get_session() as session:
+        try:
+            user = ensure_from_effective_user(session, update.effective_user)
+            if user is not None:
+                set_pending_action(user, PENDING_SET_DISPLAY_NAME)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+
+def _get_current_display_name(update: Update) -> str | None:
+    with get_session() as session:
+        user = ensure_from_effective_user(session, update.effective_user)
+        session.commit()
+        return user.display_name if user is not None else None
+
+
+def _get_current_user_settings(update: Update):
+    with get_session() as session:
+        user = ensure_from_effective_user(session, update.effective_user)
+        session.commit()
+        return user
+
+
+async def _toggle_news_notifications(update: Update) -> None:
+    with get_session() as session:
+        try:
+            user = ensure_from_effective_user(session, update.effective_user)
+            if user is not None:
+                toggle_news_notifications(user)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+    await showSettingsNotifications(update, user)
+
+
+def _clear_name_pending(update: Update) -> None:
+    with get_session() as session:
+        try:
+            user = ensure_from_effective_user(session, update.effective_user)
+            if user is not None and user.pending_action == PENDING_SET_DISPLAY_NAME:
+                clear_pending_action(user)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
 
 def register_main_menu_handler(application) -> None:

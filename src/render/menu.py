@@ -7,6 +7,7 @@ from src.keyboards.inline_buttons import PLAY_ACTIONS, TOPICS
 from src.keyboards.kb_build import (
     getBackToMenuKeyboard,
     getMainMenuKeyboard,
+    getNamePromptKeyboard,
     getPlayTopicsKeyboard,
     getSettingsKeyboard,
     getSettingsLanguageKeyboard,
@@ -23,6 +24,7 @@ from src.keyboards.kb_build import (
 )
 from src.keyboards.lobby_keyboard import get_play_main_keyboard
 from src.render.lobby_render import render_play_main
+from src.services.chat_cleanup_service import edit_active_screen, remember_telegram_message
 
 
 MAIN_MENU_TEXT = "Добро пожаловать в RoleHub!\n\nГлавное меню:"
@@ -34,7 +36,9 @@ async def _render(update: Update, text: str, reply_markup=None) -> None:
     if query is not None:
         await query.answer()
         try:
-            await query.edit_message_text(text, reply_markup=reply_markup)
+            sent_message = await query.edit_message_text(text, reply_markup=reply_markup)
+            if sent_message is not True:
+                remember_telegram_message(sent_message, is_active_screen=True)
         except BadRequest as exc:
             message = str(exc).lower()
             if "message is not modified" in message:
@@ -42,7 +46,11 @@ async def _render(update: Update, text: str, reply_markup=None) -> None:
         return
 
     if update.message is not None:
-        await update.message.reply_text(text, reply_markup=reply_markup)
+        if await edit_active_screen(update, text, reply_markup):
+            return
+
+        sent_message = await update.message.reply_text(text, reply_markup=reply_markup)
+        remember_telegram_message(sent_message, is_active_screen=True)
 
 
 def get_topic_name(topic: str) -> str | None:
@@ -55,6 +63,18 @@ def get_action_name(action: str) -> str | None:
 
 async def showMainMenu(update: Update) -> None:
     await _render(update, MAIN_MENU_TEXT, getMainMenuKeyboard())
+
+
+async def showNamePrompt(update: Update) -> None:
+    await _render(
+        update,
+        (
+            "👤 Как тебя называть в RoleHub?\n\n"
+            "Напиши имя следующим сообщением. Оно будет привязано к твоему Telegram ID "
+            "и должно быть уникальным."
+        ),
+        getNamePromptKeyboard(),
+    )
 
 
 async def showPlayTopics(update: Update) -> None:
@@ -124,19 +144,24 @@ async def showSettings(update: Update) -> None:
     )
 
 
-async def showSettingsProfile(update: Update) -> None:
+async def showSettingsProfile(update: Update, display_name: str | None = None) -> None:
+    text = "👤 Настройки профиля\n\n"
+    if display_name:
+        text += f"Имя: {display_name}\n\n"
+    text += "Здесь можно изменить отображение профиля в RoleHub."
+
     await _render(
         update,
-        "👤 Настройки профиля\n\nЗдесь можно будет изменить отображение профиля в RoleHub.",
+        text,
         getSettingsProfileKeyboard(),
     )
 
 
-async def showSettingsNotifications(update: Update) -> None:
+async def showSettingsNotifications(update: Update, user_settings=None) -> None:
     await _render(
         update,
         "🔔 Уведомления\n\nНастрой, какие уведомления получать:",
-        getSettingsNotificationsKeyboard(),
+        getSettingsNotificationsKeyboard(user_settings),
     )
 
 

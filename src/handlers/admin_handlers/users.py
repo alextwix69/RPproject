@@ -13,6 +13,7 @@ from src.core.config import get_admin_ids
 from src.core.database import get_session
 from src.keyboards.kb_build import build_admin_panel
 from src.models.user import User
+from src.services.chat_cleanup_service import remember_telegram_message, reply_text
 from src.repositories.user_repo import (
     get_by_telegram_id,
     get_users_stats,
@@ -34,7 +35,7 @@ async def _deny(update: Update) -> None:
         return
 
     if update.message is not None:
-        await update.message.reply_text("Нет доступа")
+        await reply_text(update.message, "Нет доступа")
 
 
 def _format_datetime(value: datetime | None) -> str:
@@ -62,6 +63,9 @@ def _format_full_name(user: User) -> str:
 
 
 def _format_display_name(user: User) -> str:
+    if user.display_name:
+        return user.display_name
+
     if user.username:
         return f"@{user.username}"
 
@@ -72,6 +76,7 @@ def _format_user_short(user: User, number: int) -> str:
     return (
         f"{number}. {_format_display_name(user)}\n"
         f"TG ID: {user.telegram_id}\n"
+        f"RoleHub имя: {user.display_name or '-'}\n"
         f"Имя: {_format_full_name(user)}\n"
         f"Язык: {user.language_code or '-'}\n"
         f"Первый вход: {_format_datetime(user.first_seen_at)}\n"
@@ -85,6 +90,7 @@ def _format_user_full(user: User) -> str:
         f"DB ID: {user.id}\n"
         f"TG ID: {user.telegram_id}\n"
         f"Отображение: {_format_display_name(user)}\n"
+        f"RoleHub имя: {user.display_name or '-'}\n"
         f"Username: {_format_username(user)}\n"
         f"Имя: {_format_full_name(user)}\n"
         f"Язык: {user.language_code or '-'}\n"
@@ -133,6 +139,7 @@ def _users_csv_file() -> InputFile:
             "db_id",
             "telegram_id",
             "display_name",
+            "rolehub_name",
             "username",
             "full_name",
             "first_name",
@@ -153,6 +160,7 @@ def _users_csv_file() -> InputFile:
                 user.id,
                 user.telegram_id,
                 _format_display_name(user),
+                user.display_name,
                 user.username,
                 _format_full_name(user),
                 user.first_name,
@@ -190,7 +198,7 @@ async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if update.message is None:
         return
 
-    await update.message.reply_text(_users_text(limit=_parse_limit(context)))
+    await reply_text(update.message, _users_text(limit=_parse_limit(context)))
 
 
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -202,23 +210,23 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     if not context.args:
-        await update.message.reply_text("Использование: /user <telegram_id>")
+        await reply_text(update.message, "Использование: /user <telegram_id>")
         return
 
     try:
         telegram_id = int(context.args[0])
     except ValueError:
-        await update.message.reply_text("Telegram ID должен быть числом.")
+        await reply_text(update.message, "Telegram ID должен быть числом.")
         return
 
     with get_session() as session:
         user = get_by_telegram_id(session, telegram_id)
 
     if user is None:
-        await update.message.reply_text("Пользователь не найден.")
+        await reply_text(update.message, "Пользователь не найден.")
         return
 
-    await update.message.reply_text(_format_user_full(user))
+    await reply_text(update.message, _format_user_full(user))
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -227,7 +235,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     if update.message is not None:
-        await update.message.reply_text(_stats_text())
+        await reply_text(update.message, _stats_text())
 
 
 async def export_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -236,10 +244,11 @@ async def export_users_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     if update.message is not None:
-        await update.message.reply_document(
+        sent_message = await update.message.reply_document(
             document=_users_csv_file(),
             caption="Экспорт пользователей из БД",
         )
+        remember_telegram_message(sent_message)
 
 
 async def admin_users_callback(
@@ -257,21 +266,32 @@ async def admin_users_callback(
 
     if query.data == "admin:users":
         await query.answer()
-        await query.edit_message_text(_users_text(), reply_markup=build_admin_panel())
+        sent_message = await query.edit_message_text(
+            _users_text(),
+            reply_markup=build_admin_panel(),
+        )
+        if sent_message is not True:
+            remember_telegram_message(sent_message, is_active_screen=True)
         return
 
     if query.data == "admin:stats":
         await query.answer()
-        await query.edit_message_text(_stats_text(), reply_markup=build_admin_panel())
+        sent_message = await query.edit_message_text(
+            _stats_text(),
+            reply_markup=build_admin_panel(),
+        )
+        if sent_message is not True:
+            remember_telegram_message(sent_message, is_active_screen=True)
         return
 
     if query.data == "admin:export_users":
         await query.answer("Готовлю CSV")
         if query.message is not None:
-            await query.message.reply_document(
+            sent_message = await query.message.reply_document(
                 document=_users_csv_file(),
                 caption="Экспорт пользователей из БД",
             )
+            remember_telegram_message(sent_message)
 
 
 def register_admin_users_handlers(application) -> None:

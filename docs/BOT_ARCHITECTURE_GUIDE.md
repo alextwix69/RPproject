@@ -90,7 +90,9 @@ Handlers принимают Telegram-события. Services принимают
 - `_ensure_runtime_columns()` - SQLite-совместимость для старой БД, добавляет поля в `users`, если их ещё нет:
   - `current_lobby_id`;
   - `pending_action`;
-  - `create_state`.
+  - `create_state`;
+  - `display_name`;
+  - `news_notifications_enabled`.
 
 Важно: `expire_on_commit=False` нужен, чтобы ORM-объекты можно было безопасно читать после `session.commit()` внутри handler.
 
@@ -122,9 +124,11 @@ Handlers принимают Telegram-события. Services принимают
   - `first_name`;
   - `last_name`;
   - `language_code`;
+  - `display_name`;
   - `is_bot`;
 - служебные поля:
   - `role`;
+  - `news_notifications_enabled`;
   - `is_registered`;
   - `current_lobby_id`;
   - `pending_action`;
@@ -140,6 +144,18 @@ Handlers принимают Telegram-события. Services принимают
 - `current_lobby_id` показывает, в каком лобби сейчас находится пользователь;
 - `pending_action` хранит ожидание следующего текстового сообщения, например ввод кода или поиск роли;
 - `create_state` хранит временное состояние создания лобби.
+- `display_name` хранит уникальное имя профиля RoleHub, привязанное к Telegram ID.
+- `news_notifications_enabled` управляет получением новостных рассылок `/notify`.
+
+### `src/models/chat_message.py`
+
+Модель `ChatMessage`.
+
+Хранит Telegram `message_id`, которые бот знает и может попробовать удалить через `/clear` или перед новым `/start`.
+
+Активный экран бота, например главное меню, настройки или экран комнаты, помечается как `is_active_screen=True`.
+`/clear` и очистка перед `/start` пытаются удалить все сохранённые сообщения этого чата, кроме текущего активного экрана.
+Когда бот показывает новый активный экран, предыдущий активный экран становится обычным очищаемым сообщением.
 
 ### `src/models/lobby.py`
 

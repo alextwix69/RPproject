@@ -10,13 +10,14 @@ handlers, callbacks, middlewares, конфигурация и инфрастру
 from src.core.config import get_api_key
 from src.core.database import create_db_tables
 
-from telegram.ext import ApplicationBuilder
+from telegram.ext import ApplicationBuilder, MessageHandler, filters
 
 
 from src.handlers.start import register_start_handler
 from src.handlers.admin import register_admin_handler 
 from src.handlers.main_menu import register_main_menu_handler
 from src.handlers.play_lobby import register_lobby_message_handler, start_lobby_background_tasks
+from src.services.chat_cleanup_service import track_incoming_message
 
 # Создание приложения бота
 def build_application():
@@ -33,6 +34,7 @@ def build_application():
     if application == None:
         raise RuntimeError("Ошибка билда приложения")
     
+    application.add_handler(MessageHandler(filters.ALL, track_incoming_message), group=-1)
     register_start_handler(application)
     register_admin_handler(application)
     register_main_menu_handler(application)

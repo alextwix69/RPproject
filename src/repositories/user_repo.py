@@ -26,6 +26,13 @@ def get_by_telegram_id(session: Session, telegram_id: int) -> User | None:
     return session.scalar(stmt)
 
 
+def get_by_display_name(session: Session, display_name: str) -> User | None:
+    """Ищет пользователя по имени профиля без учета регистра."""
+
+    stmt = select(User).where(func.lower(User.display_name) == display_name.lower())
+    return session.scalar(stmt)
+
+
 def get_by_id(session: Session, user_id: int) -> User | None:
     stmt = select(User).where(User.id == user_id)
     return session.scalar(stmt)
@@ -50,6 +57,18 @@ def list_all_users(session: Session) -> list[User]:
     """Возвращает всех пользователей для CSV-экспорта."""
 
     stmt = select(User).order_by(User.id.asc())
+    return list(session.scalars(stmt).all())
+
+
+def list_news_notification_users(session: Session) -> list[User]:
+    """Возвращает пользователей, которые включили новостные уведомления."""
+
+    stmt = (
+        select(User)
+        .where(User.news_notifications_enabled.is_(True))
+        .where(User.is_bot.is_(False))
+        .order_by(User.id.asc())
+    )
     return list(session.scalars(stmt).all())
 
 
@@ -102,6 +121,7 @@ def create_from_effective_user(session: Session, effective_user) -> User:
         last_name=effective_user.last_name,
         language_code=effective_user.language_code,
         is_bot=effective_user.is_bot,
+        news_notifications_enabled=True,
         first_seen_at=now,
         last_seen_at=now,
     )
@@ -123,6 +143,8 @@ def update_from_effective_user(user: User, effective_user) -> User:
     user.last_name = effective_user.last_name
     user.language_code = effective_user.language_code
     user.is_bot = effective_user.is_bot
+    if user.news_notifications_enabled is None:
+        user.news_notifications_enabled = True
     user.last_seen_at = datetime.utcnow()
 
     # Важно: is_registered здесь не меняем.

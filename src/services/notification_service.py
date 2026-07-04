@@ -9,6 +9,7 @@ from src.render.lobby_render import render_active_lobby_started
 from src.render.lobby_render import role_name
 from src.repositories import lobby_member_repo, lobby_repo
 from src.repositories.user_repo import get_by_id
+from src.services.chat_cleanup_service import remember_telegram_message
 from src.utils.display_name import format_display_name
 
 REASON_TEXTS = {
@@ -95,7 +96,12 @@ async def _safe_send(
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> None:
     try:
-        await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+        message = await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        remember_telegram_message(message, is_active_screen=reply_markup is not None)
     except Exception:
         logger.exception("Failed to send lobby notification to chat %s", chat_id)
 

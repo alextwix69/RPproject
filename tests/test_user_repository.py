@@ -5,9 +5,17 @@ from sqlalchemy.orm import sessionmaker
 
 from src.models.base import Base
 from src.models.user import User
+from src.services.user_service import DisplayNameError
 from src.services.user_service import ensure_from_effective_user
+from src.services.user_service import set_display_name
+from src.services.user_service import toggle_news_notifications
 
-from src.repositories.user_repo import get_by_telegram_id, get_users_stats, list_users
+from src.repositories.user_repo import (
+    get_by_telegram_id,
+    get_users_stats,
+    list_news_notification_users,
+    list_users,
+)
 
 def make_effective_user(
     telegram_id: int = 100,
@@ -56,6 +64,7 @@ def test_new_effective_user_creates_user():
     assert user is not None
     assert user.telegram_id == effective_user.id
     assert user.username == "test_user"
+    assert user.display_name is None
 
     session.close()
 
@@ -159,5 +168,81 @@ def test_admin_user_list_and_stats():
     assert stats["registered"] == 1
     assert stats["not_registered"] == 1
     assert stats["bots"] == 0
+
+    session.close()
+
+
+def test_news_notifications_enabled_by_default_and_can_be_toggled():
+    session = make_session()
+    user = ensure_from_effective_user(session, make_effective_user())
+
+    assert user.news_notifications_enabled is True
+
+    enabled = toggle_news_notifications(user)
+    session.commit()
+
+    assert enabled is False
+    assert user.news_notifications_enabled is False
+
+    session.close()
+
+
+def test_list_news_notification_users_returns_only_enabled_humans():
+    session = make_session()
+    enabled_user = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=1, username="enabled"),
+    )
+    disabled_user = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=2, username="disabled"),
+    )
+    bot_user = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=3, username="bot", is_bot=True),
+    )
+    disabled_user.news_notifications_enabled = False
+    session.commit()
+
+    users = list_news_notification_users(session)
+
+    assert [user.id for user in users] == [enabled_user.id]
+    assert bot_user not in users
+
+    session.close()
+
+
+def test_set_display_name_saves_normalized_unique_name():
+    session = make_session()
+    user = ensure_from_effective_user(session, make_effective_user())
+
+    set_display_name(session, user, "  Alice   Rolehub  ")
+    session.commit()
+
+    assert user.display_name == "Alice Rolehub"
+    assert user.is_registered is True
+
+    session.close()
+
+
+def test_set_display_name_rejects_duplicate_case_insensitive_name():
+    session = make_session()
+    user_1 = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=1, username="first"),
+    )
+    user_2 = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=2, username="second"),
+    )
+    set_display_name(session, user_1, "Alice")
+    session.commit()
+
+    try:
+        set_display_name(session, user_2, "alice")
+    except DisplayNameError as exc:
+        assert exc.code == "taken"
+    else:
+        raise AssertionError("Duplicate display name should be rejected.")
 
     session.close()

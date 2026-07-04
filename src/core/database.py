@@ -15,6 +15,7 @@ from src.core.logger import logger
 from src.models.base import Base
 from src.models import lobby as _lobby_models  # noqa: F401
 from src.models import user as _user_models  # noqa: F401
+from src.models import chat_message as _chat_message_models  # noqa: F401
 
 db_url = get_database_url()
 engine = create_engine(db_url)
@@ -55,11 +56,28 @@ def _ensure_runtime_columns() -> None:
         statements.append("ALTER TABLE users ADD COLUMN pending_action VARCHAR(64)")
     if "create_state" not in columns:
         statements.append("ALTER TABLE users ADD COLUMN create_state JSON")
+    if "display_name" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN display_name VARCHAR(32)")
+    if "news_notifications_enabled" not in columns:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN news_notifications_enabled BOOLEAN DEFAULT 1"
+        )
 
-    if not statements:
-        return
+    chat_columns = set()
+    if "chat_messages" in inspector.get_table_names():
+        chat_columns = {column["name"] for column in inspector.get_columns("chat_messages")}
+    if "chat_messages" in inspector.get_table_names() and "is_active_screen" not in chat_columns:
+        statements.append(
+            "ALTER TABLE chat_messages ADD COLUMN is_active_screen BOOLEAN DEFAULT 0"
+        )
 
     with engine.begin() as connection:
         for statement in statements:
             logger.info("runtime schema update: %s", statement)
             connection.execute(text(statement))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ix_users_display_name ON users (display_name)"
+            )
+        )

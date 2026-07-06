@@ -19,26 +19,30 @@ from src.keyboards.kb_build import (
     getSupportKeyboard,
 )
 from src.keyboards.lobby_keyboard import get_play_main_reply_keyboard
+from src.core.database import get_session
 from src.render.lobby_render import render_play_main
+from src.repositories import lobby_member_repo, lobby_repo
 from src.services.chat_cleanup_service import remember_telegram_message
+from src.services.user_service import ensure_from_effective_user
 
 
 MAIN_MENU_TEXT = "Добро пожаловать в RoleHub!\n\nГлавное меню:"
 
 
 async def _render(update: Update, text: str, reply_markup=None) -> None:
-    if update.message is not None:
+    message = update.effective_message
+    if message is not None:
         if isinstance(reply_markup, (ReplyKeyboardMarkup, ReplyKeyboardRemove)):
-            sent_message = await update.message.reply_text(text, reply_markup=reply_markup)
+            sent_message = await message.reply_text(text, reply_markup=reply_markup)
             remember_telegram_message(sent_message, is_active_screen=True)
             return
 
-        sent_message = await update.message.reply_text(text, reply_markup=reply_markup)
+        sent_message = await message.reply_text(text, reply_markup=reply_markup)
         remember_telegram_message(sent_message, is_active_screen=True)
 
 
 async def showMainMenu(update: Update) -> None:
-    await _render(update, MAIN_MENU_TEXT, getMainMenuKeyboard())
+    await _render(update, MAIN_MENU_TEXT, getMainMenuKeyboard(_has_current_open_lobby(update)))
 
 
 async def showNamePrompt(update: Update) -> None:
@@ -57,8 +61,28 @@ async def showPlayTopics(update: Update) -> None:
     await _render(
         update,
         render_play_main(),
-        get_play_main_reply_keyboard(),
+        get_play_main_reply_keyboard(_has_current_open_lobby(update)),
     )
+
+
+def _has_current_open_lobby(update: Update) -> bool:
+    if update.effective_user is None:
+        return False
+
+    with get_session() as session:
+        user = ensure_from_effective_user(session, update.effective_user)
+        if user is None or user.current_lobby_id is None:
+            session.commit()
+            return False
+
+        lobby = lobby_repo.get_by_id(session, user.current_lobby_id)
+        if lobby is None or lobby.status == "closed":
+            session.commit()
+            return False
+
+        member = lobby_member_repo.get_joined_member(session, lobby.id, user.id)
+        session.commit()
+        return member is not None
 
 
 async def showShop(update: Update) -> None:

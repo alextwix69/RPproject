@@ -11,6 +11,7 @@ BTN_PLAY = "🎮 Играть"
 BTN_SHOP = "🛍 Магазин"
 BTN_SETTINGS = "⚙️ Настройки"
 BTN_SUPPORT = "🆘 Поддержка"
+BTN_RETURN_TO_ACTIVE_LOBBY = "↩️ Вернуться в активное лобби"
 
 BTN_ADMIN_USERS = "Пользователи"
 BTN_ADMIN_STATS = "Статистика"
@@ -85,13 +86,19 @@ def build_admin_panel() -> ReplyKeyboardMarkup:
     )
 
 
-def getMainMenuKeyboard() -> ReplyKeyboardMarkup:
-    return _build_reply_keyboard(
+def getMainMenuKeyboard(include_return_to_lobby: bool = False) -> ReplyKeyboardMarkup:
+    rows = []
+    if include_return_to_lobby:
+        rows.append([BTN_RETURN_TO_ACTIVE_LOBBY])
+    rows.extend(
         [
             [BTN_PLAY],
             [BTN_SHOP],
             [BTN_SETTINGS, BTN_SUPPORT],
         ]
+    )
+    return _build_reply_keyboard(
+        rows
     )
 
 

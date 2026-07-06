@@ -1,6 +1,8 @@
 """Клавиатуры lobby-механики."""
 
 from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
@@ -35,7 +37,19 @@ BTN_CREATE_OWN = "➕ Создать своё"
 BTN_PLAY = "🎮 Играть"
 BTN_SEARCH_MORE = "🔁 Искать ещё"
 BTN_TRY_AGAIN = "🔁 Попробовать ещё"
-BTN_RETURN_TO_LOBBY = "Вернуться в лобби"
+BTN_RETURN_TO_LOBBY = "↩️ Вернуться в активное лобби"
+
+CB_TOPIC_PREFIX = "lobby:topic:"
+CB_CREATE_ROLE_PREFIX = "lobby:create_role:"
+CB_CREATE_ROLE_PAGE_PREFIX = "lobby:create_role_page:"
+CB_JOIN_ROLE_PREFIX = "lobby:join_role:"
+CB_JOIN_ROLE_PAGE_PREFIX = "lobby:join_role_page:"
+CB_CREATE_SEARCH_ROLE_PREFIX = "lobby:create_search_role:"
+CB_JOIN_SEARCH_ROLE_PREFIX = "lobby:join_search_role:"
+CB_FIND_ROLE = "lobby:find_role"
+CB_RANDOM_ROLE = "lobby:random_role"
+CB_RANDOM_FREE_ROLE = "lobby:random_free_role"
+CB_SEARCH_MORE = "lobby:search_more"
 
 
 def _reply(rows: list[list[str]]) -> ReplyKeyboardMarkup:
@@ -50,16 +64,33 @@ def _with_nav(rows: list[list[str]]) -> list[list[str]]:
     return rows + [[BTN_BACK, BTN_MAIN_MENU]]
 
 
-def get_play_main_reply_keyboard() -> ReplyKeyboardMarkup:
-    return _reply(_with_nav([[BTN_CREATE_LOBBY, BTN_FIND_LOBBY]]))
+def get_play_main_reply_keyboard(include_return_to_lobby: bool = False) -> ReplyKeyboardMarkup:
+    rows = []
+    if include_return_to_lobby:
+        rows.append([BTN_RETURN_TO_LOBBY])
+    rows.append([BTN_CREATE_LOBBY, BTN_FIND_LOBBY])
+    return _reply(_with_nav(rows))
 
 
 def get_find_main_reply_keyboard() -> ReplyKeyboardMarkup:
     return _reply(_with_nav([[BTN_SEARCH_BY_CODE], [BTN_SELECT_TOPIC]]))
 
 
+def get_navigation_reply_keyboard() -> ReplyKeyboardMarkup:
+    return _reply(_with_nav([]))
+
+
 def get_topic_reply_keyboard() -> ReplyKeyboardMarkup:
     return _reply(_with_nav([[label] for label in TOPIC_BUTTONS.values()]))
+
+
+def get_topic_inline_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton(label, callback_data=f"{CB_TOPIC_PREFIX}{topic}")]
+            for topic, label in TOPIC_BUTTONS.items()
+        ]
+    )
 
 
 def get_create_role_reply_keyboard(topic: str, page: int = 0) -> ReplyKeyboardMarkup:
@@ -72,6 +103,21 @@ def get_create_role_reply_keyboard(topic: str, page: int = 0) -> ReplyKeyboardMa
     rows.append([BTN_FIND_ROLE])
     rows.append([BTN_RANDOM_ROLE])
     return _reply(_with_nav(rows))
+
+
+def get_create_role_inline_keyboard(topic: str, page: int = 0) -> InlineKeyboardMarkup:
+    roles = list(ROLES_BY_TOPIC.get(topic, {}).items())
+    page_roles, page, pages_count = _paginate(roles, page)
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"{CB_CREATE_ROLE_PREFIX}{role}")]
+        for role, label in page_roles
+    ]
+    nav = _inline_page_nav(page, pages_count, CB_CREATE_ROLE_PAGE_PREFIX)
+    if nav:
+        rows.append(nav)
+    rows.append([InlineKeyboardButton(BTN_FIND_ROLE, callback_data=CB_FIND_ROLE)])
+    rows.append([InlineKeyboardButton(BTN_RANDOM_ROLE, callback_data=CB_RANDOM_ROLE)])
+    return InlineKeyboardMarkup(rows)
 
 
 def get_create_privacy_reply_keyboard() -> ReplyKeyboardMarkup:
@@ -117,10 +163,53 @@ def get_join_role_reply_keyboard(
     return _reply(_with_nav(rows))
 
 
+def get_join_role_inline_keyboard(
+    code: str,
+    topic: str,
+    taken_roles: set[str],
+    page: int = 0,
+) -> InlineKeyboardMarkup:
+    roles = [
+        (role, label)
+        for role, label in ROLES_BY_TOPIC.get(topic, {}).items()
+        if role not in taken_roles
+    ]
+    page_roles, page, pages_count = _paginate(roles, page)
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"{CB_JOIN_ROLE_PREFIX}{role}")]
+        for role, label in page_roles
+    ]
+    nav = _inline_page_nav(page, pages_count, CB_JOIN_ROLE_PAGE_PREFIX)
+    if nav:
+        rows.append(nav)
+    if rows:
+        rows.append([InlineKeyboardButton(BTN_FIND_ROLE, callback_data=CB_FIND_ROLE)])
+        rows.append([InlineKeyboardButton(BTN_RANDOM_FREE_ROLE, callback_data=CB_RANDOM_FREE_ROLE)])
+    return InlineKeyboardMarkup(rows)
+
+
 def get_role_search_results_reply_keyboard(results: list[tuple[str, str]]) -> ReplyKeyboardMarkup:
     rows = [[label] for _role, label in results[:ROLE_PAGE_SIZE]]
     rows.append([BTN_SEARCH_MORE])
     return _reply(_with_nav(rows))
+
+
+def get_create_role_search_results_inline_keyboard(results: list[tuple[str, str]]) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"{CB_CREATE_SEARCH_ROLE_PREFIX}{role}")]
+        for role, label in results[:ROLE_PAGE_SIZE]
+    ]
+    rows.append([InlineKeyboardButton(BTN_SEARCH_MORE, callback_data=CB_SEARCH_MORE)])
+    return InlineKeyboardMarkup(rows)
+
+
+def get_join_role_search_results_inline_keyboard(results: list[tuple[str, str]]) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"{CB_JOIN_SEARCH_ROLE_PREFIX}{role}")]
+        for role, label in results[:ROLE_PAGE_SIZE]
+    ]
+    rows.append([InlineKeyboardButton(BTN_SEARCH_MORE, callback_data=CB_SEARCH_MORE)])
+    return InlineKeyboardMarkup(rows)
 
 
 def get_role_search_prompt_reply_keyboard() -> ReplyKeyboardMarkup:
@@ -204,4 +293,17 @@ def _reply_page_nav(page: int, pages_count: int) -> list[str]:
     row.append(f"{page + 1}/{pages_count}")
     if page < pages_count - 1:
         row.append("▶️")
+    return row
+
+
+def _inline_page_nav(page: int, pages_count: int, callback_prefix: str) -> list[InlineKeyboardButton]:
+    if pages_count <= 1:
+        return []
+
+    row = []
+    if page > 0:
+        row.append(InlineKeyboardButton("◀️", callback_data=f"{callback_prefix}{page - 1}"))
+    row.append(InlineKeyboardButton(f"{page + 1}/{pages_count}", callback_data=f"{callback_prefix}{page}"))
+    if page < pages_count - 1:
+        row.append(InlineKeyboardButton("▶️", callback_data=f"{callback_prefix}{page + 1}"))
     return row

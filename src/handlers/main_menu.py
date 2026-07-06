@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 
 from src.constants.pending_actions import PENDING_SET_DISPLAY_NAME
 from src.core.database import get_session
-from src.handlers.play_lobby import show_play_menu
+from src.handlers.play_lobby import show_current_lobby, show_play_menu
 from src.keyboards.kb_build import (
     BTN_BACK,
     BTN_FAQ_LOBBY,
@@ -19,6 +19,7 @@ from src.keyboards.kb_build import (
     BTN_PLAY,
     BTN_PROFILE_BIO,
     BTN_PROFILE_NAME,
+    BTN_RETURN_TO_ACTIVE_LOBBY,
     BTN_SAFETY_BLACKLIST,
     BTN_SAFETY_PRIVACY,
     BTN_SAFETY_REPORTS,
@@ -71,6 +72,7 @@ BTN_NEWS_OFF = "❌ Новости: Выкл"
 
 MENU_BUTTONS = {
     BTN_PLAY,
+    BTN_RETURN_TO_ACTIVE_LOBBY,
     BTN_SHOP,
     BTN_SETTINGS,
     BTN_SUPPORT,
@@ -127,6 +129,10 @@ async def main_menu_reply_router(update: Update, context: ContextTypes.DEFAULT_T
 
     if text == BTN_PLAY:
         await show_play_menu(update)
+        return
+
+    if text == BTN_RETURN_TO_ACTIVE_LOBBY:
+        await show_current_lobby(update)
         return
 
     if text == BTN_SHOP:

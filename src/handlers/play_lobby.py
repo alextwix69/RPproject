@@ -5,7 +5,7 @@ import random
 from datetime import datetime
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from src.constants.pending_actions import (
     PENDING_CREATE_ROLE_SEARCH,
@@ -45,27 +45,40 @@ from src.keyboards.lobby_keyboard import (
     BTN_SELECT_TOPIC,
     BTN_START,
     BTN_TRY_AGAIN,
+    CB_CREATE_ROLE_PAGE_PREFIX,
+    CB_CREATE_ROLE_PREFIX,
+    CB_CREATE_SEARCH_ROLE_PREFIX,
+    CB_FIND_ROLE,
+    CB_JOIN_ROLE_PAGE_PREFIX,
+    CB_JOIN_ROLE_PREFIX,
+    CB_JOIN_SEARCH_ROLE_PREFIX,
+    CB_RANDOM_FREE_ROLE,
+    CB_RANDOM_ROLE,
+    CB_SEARCH_MORE,
+    CB_TOPIC_PREFIX,
     get_active_lobby_reply_keyboard,
     get_already_in_lobby_reply_keyboard,
     get_code_entry_reply_keyboard,
     get_create_confirm_reply_keyboard,
     get_create_privacy_reply_keyboard,
-    get_create_role_reply_keyboard,
+    get_create_role_inline_keyboard,
+    get_create_role_search_results_inline_keyboard,
     get_done_reply_keyboard,
     get_find_main_reply_keyboard,
     get_found_lobby_reply_keyboard,
     get_invalid_code_reply_keyboard,
-    get_join_role_reply_keyboard,
+    get_join_role_inline_keyboard,
+    get_join_role_search_results_inline_keyboard,
     get_lobby_info_reply_keyboard,
     get_lobby_full_reply_keyboard,
     get_lobby_members_reply_keyboard,
     get_lobby_waiting_reply_keyboard,
+    get_navigation_reply_keyboard,
     get_no_lobby_reply_keyboard,
     get_play_main_reply_keyboard,
     get_role_search_prompt_reply_keyboard,
-    get_role_search_results_reply_keyboard,
+    get_topic_inline_keyboard,
     get_remove_lobby_reply_keyboard,
-    get_topic_reply_keyboard,
     role_by_label,
     topic_by_label,
 )
@@ -117,6 +130,10 @@ async def show_play_menu(update: Update) -> None:
     await _show_play_main(update)
 
 
+async def show_current_lobby(update: Update) -> None:
+    await _show_current_lobby(update)
+
+
 async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
@@ -163,7 +180,12 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
                         await reply_text(
                             update.message,
                             render_join_role(lobby),
-                            reply_markup=get_join_role_reply_keyboard(lobby.code, lobby.topic, taken_roles),
+                            reply_markup=get_navigation_reply_keyboard(),
+                        )
+                        await _render(
+                            update,
+                            "Роли:",
+                            get_join_role_inline_keyboard(lobby.code, lobby.topic, taken_roles),
                         )
                         return
                     lobby = join_lobby(session, user, code)
@@ -235,6 +257,131 @@ async def lobby_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     await lobby_message_service.send_message_to_lobby(update.get_bot(), lobby_id, sender_id, payload)
 
 
+async def lobby_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if query is None or query.data is None:
+        return
+
+    await query.answer()
+    data = query.data
+
+    with get_session() as session:
+        try:
+            user = _ensure_user(session, update)
+            state = get_create_state(user)
+            scene = state.get("reply_scene")
+
+            if data.startswith(CB_TOPIC_PREFIX):
+                topic = data.removeprefix(CB_TOPIC_PREFIX)
+                if scene == "create_topic":
+                    set_create_state(session, user, {"reply_scene": "create_role", "topic": topic, "page": 0})
+                    session.commit()
+                    await _render_role_choice(update, render_create_role(topic), get_create_role_inline_keyboard(topic))
+                    return
+                if scene == "find_topic":
+                    session.commit()
+                    await _show_found_lobby(update, topic)
+                    return
+
+            if data.startswith(CB_CREATE_ROLE_PAGE_PREFIX) and scene == "create_role":
+                topic = state.get("topic")
+                page = _callback_int(data, CB_CREATE_ROLE_PAGE_PREFIX)
+                set_create_state(session, user, {"reply_scene": "create_role", "page": page})
+                session.commit()
+                await _render_role_choice(update, render_create_role(topic), get_create_role_inline_keyboard(topic, page))
+                return
+
+            if data.startswith(CB_JOIN_ROLE_PAGE_PREFIX) and scene == "join_role":
+                code = state.get("code")
+                page = _callback_int(data, CB_JOIN_ROLE_PAGE_PREFIX)
+                set_create_state(session, user, {"reply_scene": "join_role", "page": page})
+                session.commit()
+                await _show_join_role_page(update, code, page)
+                return
+
+            if data == CB_FIND_ROLE and scene == "create_role":
+                set_pending_action(user, PENDING_CREATE_ROLE_SEARCH)
+                set_create_state(session, user, {"reply_scene": "create_role_search"})
+                session.commit()
+                await _render(
+                    update,
+                    "🔎 Поиск роли\n\nНапиши имя роли или часть имени. Например: Твайлайт, Спаркл, 8-Бит.",
+                    get_role_search_prompt_reply_keyboard(),
+                )
+                return
+
+            if data == CB_FIND_ROLE and scene == "join_role":
+                code = state.get("code")
+                topic = state.get("topic")
+                set_pending_action(user, f"{PENDING_JOIN_ROLE_SEARCH_PREFIX}{code}")
+                set_create_state(session, user, {"reply_scene": "join_role_search", "code": code, "topic": topic})
+                session.commit()
+                await _render(update, "🔎 Поиск роли\n\nНапиши имя роли или часть имени.", get_role_search_prompt_reply_keyboard())
+                return
+
+            if data == CB_RANDOM_ROLE and scene == "create_role":
+                topic = state.get("topic")
+                role = _resolve_role(topic, "random")
+                await _select_create_role_reply(update, session, user, topic, role, was_random=True)
+                return
+
+            if data == CB_RANDOM_FREE_ROLE and scene == "join_role":
+                code = state.get("code")
+                session.commit()
+                await _join_lobby_from_reply(update, code, "random")
+                return
+
+            if data.startswith(CB_CREATE_ROLE_PREFIX) and scene == "create_role":
+                topic = state.get("topic")
+                role = _resolve_role(topic, data.removeprefix(CB_CREATE_ROLE_PREFIX))
+                await _select_create_role_reply(update, session, user, topic, role)
+                return
+
+            if data.startswith(CB_JOIN_ROLE_PREFIX) and scene == "join_role":
+                code = state.get("code")
+                topic = state.get("topic")
+                role = _resolve_role(topic, data.removeprefix(CB_JOIN_ROLE_PREFIX))
+                session.commit()
+                await _join_lobby_from_reply(update, code, role)
+                return
+
+            if data == CB_SEARCH_MORE and scene == "create_role_search_results":
+                set_pending_action(user, PENDING_CREATE_ROLE_SEARCH)
+                set_create_state(session, user, {"reply_scene": "create_role_search"})
+                session.commit()
+                await _render(update, "🔎 Поиск роли\n\nНапиши имя роли или часть имени.", get_role_search_prompt_reply_keyboard())
+                return
+
+            if data == CB_SEARCH_MORE and scene == "join_role_search_results":
+                code = state.get("code")
+                topic = state.get("topic")
+                set_pending_action(user, f"{PENDING_JOIN_ROLE_SEARCH_PREFIX}{code}")
+                set_create_state(session, user, {"reply_scene": "join_role_search", "code": code, "topic": topic})
+                session.commit()
+                await _render(update, "🔎 Поиск роли\n\nНапиши имя роли или часть имени.", get_role_search_prompt_reply_keyboard())
+                return
+
+            if data.startswith(CB_CREATE_SEARCH_ROLE_PREFIX) and scene == "create_role_search_results":
+                topic = state.get("topic")
+                role = _resolve_role(topic, data.removeprefix(CB_CREATE_SEARCH_ROLE_PREFIX))
+                await _select_create_role_reply(update, session, user, topic, role)
+                return
+
+            if data.startswith(CB_JOIN_SEARCH_ROLE_PREFIX) and scene == "join_role_search_results":
+                code = state.get("code")
+                topic = state.get("topic")
+                role = _resolve_role(topic, data.removeprefix(CB_JOIN_SEARCH_ROLE_PREFIX))
+                session.commit()
+                await _join_lobby_from_reply(update, code, role)
+                return
+
+            session.commit()
+        except Exception:
+            session.rollback()
+            logger.exception("Lobby callback handler failed")
+            await _render(update, "Не удалось обработать действие.", get_play_main_reply_keyboard())
+
+
 async def _handle_reply_keyboard_message(update: Update, session, user) -> bool:
     if update.message is None or update.message.text is None:
         return False
@@ -263,8 +410,9 @@ async def _handle_reply_keyboard_message(update: Update, session, user) -> bool:
     if text == BTN_PLAY:
         clear_pending_action(user)
         set_create_state(session, user, {"reply_scene": "play_main"})
+        has_current_lobby = _has_current_open_lobby(session, user)
         session.commit()
-        await _render(update, render_play_main(), get_play_main_reply_keyboard())
+        await _render(update, render_play_main(), get_play_main_reply_keyboard(has_current_lobby))
         return True
 
     if text in {BTN_CREATE_LOBBY, BTN_CREATE_OWN}:
@@ -299,7 +447,7 @@ async def _handle_reply_keyboard_message(update: Update, session, user) -> bool:
         if text == BTN_SELECT_TOPIC:
             set_create_state(session, user, {"reply_scene": "find_topic"})
             session.commit()
-            await _render(update, "🔎 Поиск лобби\n\nВыбери тему:", get_topic_reply_keyboard())
+            await _render_topic_choice(update, "🔎 Поиск лобби\n\nВыбери тему:")
             return True
         return False
 
@@ -307,7 +455,7 @@ async def _handle_reply_keyboard_message(update: Update, session, user) -> bool:
         privacy = "public" if text == BTN_PUBLIC else "private"
         set_create_state(session, user, {"reply_scene": "create_topic", "privacy": privacy})
         session.commit()
-        await _render(update, render_create_topic(), get_topic_reply_keyboard())
+        await _render_topic_choice(update, render_create_topic())
         return True
 
     if scene == "create_topic":
@@ -316,7 +464,7 @@ async def _handle_reply_keyboard_message(update: Update, session, user) -> bool:
             return False
         set_create_state(session, user, {"reply_scene": "create_role", "topic": topic, "page": 0})
         session.commit()
-        await _render(update, render_create_role(topic), get_create_role_reply_keyboard(topic))
+        await _render_role_choice(update, render_create_role(topic), get_create_role_inline_keyboard(topic))
         return True
 
     if scene == "create_role":
@@ -391,7 +539,7 @@ async def _handle_reply_keyboard_message(update: Update, session, user) -> bool:
 
     if text == BTN_RETURN_TO_LOBBY:
         session.commit()
-        await _show_current_lobby_info(update)
+        await _show_current_lobby(update)
         return True
 
     return False
@@ -408,8 +556,9 @@ async def _handle_reply_back(update: Update, session, user, state: dict, scene: 
     if scene in {"create_privacy", "find_main"}:
         clear_pending_action(user)
         set_create_state(session, user, {"reply_scene": "play_main"})
+        has_current_lobby = _has_current_open_lobby(session, user)
         session.commit()
-        await _render(update, render_play_main(), get_play_main_reply_keyboard())
+        await _render(update, render_play_main(), get_play_main_reply_keyboard(has_current_lobby))
         return
 
     if scene == "create_topic":
@@ -422,14 +571,14 @@ async def _handle_reply_back(update: Update, session, user, state: dict, scene: 
         set_create_state(session, user, {"reply_scene": "create_topic"})
         clear_pending_action(user)
         session.commit()
-        await _render(update, render_create_topic(), get_topic_reply_keyboard())
+        await _render_topic_choice(update, render_create_topic())
         return
 
     if scene == "create_confirm":
         topic = state.get("topic")
         set_create_state(session, user, {"reply_scene": "create_role"})
         session.commit()
-        await _render(update, render_create_role(topic), get_create_role_reply_keyboard(topic))
+        await _render_role_choice(update, render_create_role(topic), get_create_role_inline_keyboard(topic))
         return
 
     if scene in {"find_topic", "code_entry"}:
@@ -442,7 +591,7 @@ async def _handle_reply_back(update: Update, session, user, state: dict, scene: 
     if scene in {"found_lobby", "no_lobby"}:
         set_create_state(session, user, {"reply_scene": "find_topic"})
         session.commit()
-        await _render(update, "🔎 Поиск лобби\n\nВыбери тему:", get_topic_reply_keyboard())
+        await _render_topic_choice(update, "🔎 Поиск лобби\n\nВыбери тему:")
         return
 
     if scene in {"join_role", "join_role_search", "join_role_search_results"}:
@@ -464,8 +613,9 @@ async def _handle_reply_back(update: Update, session, user, state: dict, scene: 
         await _show_lobby_waiting(update, code)
         return
 
+    has_current_lobby = _has_current_open_lobby(session, user)
     session.commit()
-    await _render(update, render_play_main(), get_play_main_reply_keyboard())
+    await _render(update, render_play_main(), get_play_main_reply_keyboard(has_current_lobby))
 
 
 async def _handle_create_role_reply(update: Update, session, user, state: dict, text: str) -> bool:
@@ -476,14 +626,14 @@ async def _handle_create_role_reply(update: Update, session, user, state: dict, 
         page = max(0, page - 1)
         set_create_state(session, user, {"reply_scene": "create_role", "page": page})
         session.commit()
-        await _render(update, render_create_role(topic), get_create_role_reply_keyboard(topic, page))
+        await _render_role_choice(update, render_create_role(topic), get_create_role_inline_keyboard(topic, page))
         return True
 
     if text == "▶️":
         page += 1
         set_create_state(session, user, {"reply_scene": "create_role", "page": page})
         session.commit()
-        await _render(update, render_create_role(topic), get_create_role_reply_keyboard(topic, page))
+        await _render_role_choice(update, render_create_role(topic), get_create_role_inline_keyboard(topic, page))
         return True
 
     if text == BTN_FIND_ROLE:
@@ -659,6 +809,23 @@ async def _show_main_menu_and_remove_reply_keyboard(update: Update) -> None:
     await showMainMenu(update)
 
 
+async def _render_topic_choice(update: Update, text: str) -> None:
+    await _render(update, text, get_navigation_reply_keyboard())
+    await _render(update, "Темы:", get_topic_inline_keyboard())
+
+
+async def _render_role_choice(update: Update, text: str, inline_keyboard) -> None:
+    await _render(update, text, get_navigation_reply_keyboard())
+    await _render(update, "Роли:", inline_keyboard)
+
+
+def _callback_int(data: str, prefix: str) -> int:
+    try:
+        return int(data.removeprefix(prefix))
+    except ValueError:
+        return 0
+
+
 async def close_expired_lobbies(context: ContextTypes.DEFAULT_TYPE) -> None:
     await close_expired_lobbies_for_bot(context.bot)
 
@@ -698,6 +865,7 @@ async def _expiration_loop(application) -> None:
 
 def register_lobby_message_handler(application) -> None:
     application.add_handler(CommandHandler("leave", leave_command))
+    application.add_handler(CallbackQueryHandler(lobby_callback_handler, pattern=r"^lobby:"))
     application.add_handler(
         MessageHandler(
             (filters.TEXT & ~filters.COMMAND) | filters.PHOTO | filters.Sticker.ALL | filters.VOICE,
@@ -751,8 +919,9 @@ async def _show_play_main(update: Update) -> None:
         clear_pending_action(user)
         clear_create_state(user)
         set_create_state(session, user, {"reply_scene": "play_main"})
+        has_current_lobby = _has_current_open_lobby(session, user)
         session.commit()
-    await _render(update, render_play_main(), get_play_main_reply_keyboard())
+    await _render(update, render_play_main(), get_play_main_reply_keyboard(has_current_lobby))
 
 
 async def _show_find_main(update: Update) -> None:
@@ -781,7 +950,7 @@ async def _show_create_topic(update: Update) -> None:
         clear_pending_action(user)
         set_create_state(session, user, {"reply_scene": "create_topic"})
         session.commit()
-    await _render(update, render_create_topic(), get_topic_reply_keyboard())
+    await _render_topic_choice(update, render_create_topic())
 
 
 async def _set_pending_code_action(update: Update) -> None:
@@ -850,7 +1019,12 @@ async def _join_lobby_from_reply(update: Update, code: str, role: str | None = N
                 await _render(
                     update,
                     render_join_role(lobby),
-                    get_join_role_reply_keyboard(lobby.code, lobby.topic, taken_roles),
+                    get_navigation_reply_keyboard(),
+                )
+                await _render(
+                    update,
+                    "Роли:",
+                    get_join_role_inline_keyboard(lobby.code, lobby.topic, taken_roles),
                 )
                 return
             if role == "random":
@@ -997,7 +1171,12 @@ async def _show_join_role_page(update: Update, code: str, page: int = 0) -> None
     await _render(
         update,
         render_join_role(lobby),
-        get_join_role_reply_keyboard(lobby.code, lobby.topic, taken_roles, page),
+        get_navigation_reply_keyboard(),
+    )
+    await _render(
+        update,
+        "Роли:",
+        get_join_role_inline_keyboard(lobby.code, lobby.topic, taken_roles, page),
     )
 
 
@@ -1061,15 +1240,46 @@ async def _show_lobby_info(update: Update, code: str) -> None:
     await _render(update, render_lobby_info(lobby), get_lobby_info_reply_keyboard(is_owner))
 
 
-async def _show_current_lobby_info(update: Update) -> None:
+async def _show_current_lobby(update: Update) -> None:
     with get_session() as session:
         user = _ensure_user(session, update)
         lobby = lobby_repo.get_current_for_user(session, user)
-        if lobby is None:
-            await _render(update, "Ты сейчас не находишься в лобби.", get_play_main_reply_keyboard())
+        if lobby is None or lobby.status == "closed":
+            if lobby is not None:
+                user.current_lobby_id = None
+            clear_pending_action(user)
+            clear_create_state(user)
+            set_create_state(session, user, {"reply_scene": "play_main"})
+            session.commit()
+            await _render(update, "Ты сейчас не находишься в активном лобби.", get_play_main_reply_keyboard())
             return
+
+        member = lobby_member_repo.get_joined_member(session, lobby.id, user.id)
+        if member is None:
+            user.current_lobby_id = None
+            clear_pending_action(user)
+            clear_create_state(user)
+            set_create_state(session, user, {"reply_scene": "play_main"})
+            session.commit()
+            await _render(update, "Ты сейчас не находишься в активном лобби.", get_play_main_reply_keyboard())
+            return
+
         code = lobby.code
-    await _show_lobby_info(update, code)
+        session.commit()
+
+    await _show_lobby_waiting(update, code)
+
+
+def _has_current_open_lobby(session, user) -> bool:
+    if user.current_lobby_id is None:
+        return False
+
+    lobby = lobby_repo.get_by_id(session, user.current_lobby_id)
+    if lobby is None or lobby.status == "closed":
+        return False
+
+    member = lobby_member_repo.get_joined_member(session, lobby.id, user.id)
+    return member is not None
 
 
 async def _show_lobby_members(update: Update, code: str) -> None:
@@ -1157,8 +1367,9 @@ async def _handle_create_role_search_message(update: Update, session, user) -> N
     await reply_text(
         update.message,
         "Нашёл роли. Выбери нужную:",
-        reply_markup=get_role_search_results_reply_keyboard(results),
+        reply_markup=get_navigation_reply_keyboard(),
     )
+    await _render(update, "Роли:", get_create_role_search_results_inline_keyboard(results))
 
 
 async def _handle_display_name_message(update: Update, session, user) -> None:
@@ -1234,8 +1445,9 @@ async def _handle_join_role_search_message(update: Update, session, user) -> Non
     await reply_text(
         update.message,
         "Нашёл свободные роли. Выбери нужную:",
-        reply_markup=get_role_search_results_reply_keyboard(results),
+        reply_markup=get_navigation_reply_keyboard(),
     )
+    await _render(update, "Роли:", get_join_role_search_results_inline_keyboard(results))
 
 
 async def _show_lobby_error(update: Update, exc: LobbyError) -> None:

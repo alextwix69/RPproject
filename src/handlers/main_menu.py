@@ -65,7 +65,12 @@ from src.render.menu import (
     showSupportFaq,
 )
 from src.services.user_service import ensure_from_effective_user, toggle_news_notifications
-from src.services.user_state_service import clear_pending_action, set_pending_action
+from src.services.user_state_service import (
+    clear_pending_action,
+    get_create_state,
+    set_create_state,
+    set_pending_action,
+)
 
 BTN_NEWS_ON = "✅ Новости: Вкл"
 BTN_NEWS_OFF = "❌ Новости: Выкл"
@@ -124,7 +129,7 @@ async def main_menu_reply_router(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if text == BTN_BACK:
-        await showMainMenu(update)
+        await _handle_back(update)
         return
 
     if text == BTN_PLAY:
@@ -136,14 +141,17 @@ async def main_menu_reply_router(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if text == BTN_SHOP:
+        _set_menu_scene(update, "shop")
         await showShop(update)
         return
 
     if text == BTN_SETTINGS:
+        _set_menu_scene(update, "settings")
         await showSettings(update)
         return
 
     if text == BTN_SUPPORT:
+        _set_menu_scene(update, "support")
         await showSupport(update)
         return
 
@@ -154,10 +162,13 @@ async def main_menu_reply_router(update: Update, context: ContextTypes.DEFAULT_T
 
 async def _handle_shop_text(update: Update, text: str) -> None:
     if text == BTN_SHOP_PROFILES:
+        _set_menu_scene(update, "shop")
         await showShopProfiles(update)
     elif text == BTN_SHOP_THEMES:
+        _set_menu_scene(update, "shop")
         await showShopThemes(update)
     elif text == BTN_SHOP_PREMIUM:
+        _set_menu_scene(update, "shop")
         await showShopPremium(update)
     elif text == BTN_SHOP_PROMO:
         await showComingSoon(update, "Промокод", "Ввод промокодов пока в разработке.", "shop")
@@ -172,17 +183,22 @@ async def _handle_shop_text(update: Update, text: str) -> None:
     elif text == BTN_SHOP_BUY_PREMIUM:
         await showComingSoon(update, "Покупка премиума пока в разработке.", "", "shop")
     elif text == BTN_SHOP_PREMIUM_INFO:
+        _set_menu_scene(update, "shop_premium")
         await showPremiumInfo(update)
 
 
 async def _handle_settings_text(update: Update, text: str) -> None:
     if text == BTN_SETTINGS_PROFILE:
+        _set_menu_scene(update, "settings")
         await showSettingsProfile(update, _get_current_display_name(update))
     elif text == BTN_SETTINGS_NOTIFICATIONS:
+        _set_menu_scene(update, "settings")
         await showSettingsNotifications(update, _get_current_user_settings(update))
     elif text == BTN_SETTINGS_LANGUAGE:
+        _set_menu_scene(update, "settings")
         await showSettingsLanguage(update)
     elif text == BTN_SETTINGS_SAFETY:
+        _set_menu_scene(update, "settings")
         await showSettingsSafety(update)
     elif text == BTN_PROFILE_NAME:
         _set_name_pending(update)
@@ -209,19 +225,70 @@ async def _handle_settings_text(update: Update, text: str) -> None:
 
 async def _handle_support_text(update: Update, text: str) -> None:
     if text == BTN_SUPPORT_FAQ:
+        _set_menu_scene(update, "support_faq")
         await showSupportFaq(update)
     elif text == BTN_SUPPORT_BUG:
         await showComingSoon(update, "Сообщить об ошибке", "Функция отправки баг-репортов пока в разработке.", "support")
     elif text == BTN_SUPPORT_ADMIN:
         await showComingSoon(update, "Связаться с админом", "Связь с администратором пока в разработке.", "support")
     elif text == BTN_SUPPORT_RULES:
+        _set_menu_scene(update, "support")
         await showRules(update)
     elif text == BTN_FAQ_PLAY:
+        _set_menu_scene(update, "support_faq_answer")
         await showFaqAnswer(update, "play")
     elif text == BTN_FAQ_LOBBY:
+        _set_menu_scene(update, "support_faq_answer")
         await showFaqAnswer(update, "lobby")
     elif text == BTN_FAQ_SHOP:
+        _set_menu_scene(update, "support_faq_answer")
         await showFaqAnswer(update, "shop")
+
+
+async def _handle_back(update: Update) -> None:
+    scene = _get_menu_scene(update)
+    if scene == "support_faq_answer":
+        _set_menu_scene(update, "support_faq")
+        await showSupportFaq(update)
+        return
+    if scene in {"support_faq", "support"}:
+        _set_menu_scene(update, "support")
+        await showSupport(update)
+        return
+    if scene == "shop_premium":
+        _set_menu_scene(update, "shop")
+        await showShopPremium(update)
+        return
+    if scene == "shop":
+        _set_menu_scene(update, "shop")
+        await showShop(update)
+        return
+    if scene == "settings":
+        _set_menu_scene(update, "settings")
+        await showSettings(update)
+        return
+
+    await showMainMenu(update)
+
+
+def _set_menu_scene(update: Update, scene: str) -> None:
+    with get_session() as session:
+        try:
+            user = ensure_from_effective_user(session, update.effective_user)
+            if user is not None:
+                set_create_state(session, user, {"menu_scene": scene})
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
+
+def _get_menu_scene(update: Update) -> str | None:
+    with get_session() as session:
+        user = ensure_from_effective_user(session, update.effective_user)
+        scene = get_create_state(user).get("menu_scene") if user is not None else None
+        session.commit()
+        return scene
 
 
 def _ensure_reply_user(update: Update) -> None:

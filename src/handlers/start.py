@@ -55,6 +55,7 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if update.message is None:
         return
 
+    await showMainMenu(update)
     await clear_chat(update)
 
 

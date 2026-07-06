@@ -27,6 +27,7 @@ BTN_REFRESH = "🔄 Обновить"
 BTN_INVITE = "📨 Пригласить"
 BTN_START = "▶️ Запустить"
 BTN_CLOSE = "🏁 Закрыть"
+BTN_LEAVE = "🚪 Выйти"
 BTN_JOIN = "✅ Войти"
 BTN_NEXT = "🔄 Следующее"
 BTN_MEMBERS = "👥 Участники"
@@ -46,6 +47,8 @@ CB_JOIN_ROLE_PREFIX = "lobby:join_role:"
 CB_JOIN_ROLE_PAGE_PREFIX = "lobby:join_role_page:"
 CB_CREATE_SEARCH_ROLE_PREFIX = "lobby:create_search_role:"
 CB_JOIN_SEARCH_ROLE_PREFIX = "lobby:join_search_role:"
+CB_LOBBY_SELECT_PREFIX = "lobby:select:"
+CB_LOBBY_LIST_PAGE_PREFIX = "lobby:list_page:"
 CB_FIND_ROLE = "lobby:find_role"
 CB_RANDOM_ROLE = "lobby:random_role"
 CB_RANDOM_FREE_ROLE = "lobby:random_free_role"
@@ -129,11 +132,11 @@ def get_create_confirm_reply_keyboard() -> ReplyKeyboardMarkup:
 
 
 def get_lobby_waiting_reply_keyboard(is_owner: bool) -> ReplyKeyboardMarkup:
-    rows = [[BTN_REFRESH]]
+    rows = []
     if is_owner:
         rows.append([BTN_INVITE])
-        rows.append([BTN_START])
         rows.append([BTN_CLOSE])
+    rows.append([BTN_LEAVE])
     return _reply(_with_nav(rows))
 
 
@@ -212,6 +215,21 @@ def get_join_role_search_results_inline_keyboard(results: list[tuple[str, str]])
     return InlineKeyboardMarkup(rows)
 
 
+def get_lobby_list_inline_keyboard(
+    lobbies: list[tuple[str, str]],
+    page: int,
+    pages_count: int,
+) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"{CB_LOBBY_SELECT_PREFIX}{code}")]
+        for code, label in lobbies
+    ]
+    nav = _inline_page_nav(page, pages_count, CB_LOBBY_LIST_PAGE_PREFIX)
+    if nav:
+        rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
 def get_role_search_prompt_reply_keyboard() -> ReplyKeyboardMarkup:
     return _reply(_with_nav([]))
 
@@ -232,6 +250,7 @@ def get_active_lobby_reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMark
     rows = [[BTN_MEMBERS, BTN_INFO]]
     if is_owner:
         rows.append([BTN_CLOSE])
+    rows.append([BTN_LEAVE])
     return _reply(_with_nav(rows))
 
 
@@ -239,6 +258,7 @@ def get_lobby_info_reply_keyboard(is_owner: bool = False) -> ReplyKeyboardMarkup
     rows = [[BTN_MEMBERS]]
     if is_owner:
         rows.append([BTN_CLOSE])
+    rows.append([BTN_LEAVE])
     return _reply(_with_nav(rows))
 
 

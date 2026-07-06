@@ -38,6 +38,7 @@ logs/*
 *.sqlite3
 
 # Tooling and OS/editor noise
+bugs.md
 .idea/
 .vscode/
 *.swp

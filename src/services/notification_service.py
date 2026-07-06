@@ -21,7 +21,7 @@ REASON_TEXTS = {
 }
 
 
-async def notify_lobby_started(bot: Bot, lobby_id: int) -> None:
+async def notify_lobby_started(bot: Bot, lobby_id: int, exclude_user_id: int | None = None) -> None:
     with get_session() as session:
         lobby = lobby_repo.get_by_id(session, lobby_id)
         if lobby is None:
@@ -30,6 +30,8 @@ async def notify_lobby_started(bot: Bot, lobby_id: int) -> None:
         text = render_active_lobby_started(lobby)
 
     for member, user in recipients:
+        if exclude_user_id is not None and user.id == exclude_user_id:
+            continue
         await _safe_send(bot, user.telegram_id, text, get_active_lobby_reply_keyboard(member.is_owner))
 
 
@@ -71,13 +73,15 @@ async def notify_user_left(bot: Bot, lobby_id: int, user_id: int) -> None:
         await _safe_send(bot, user.telegram_id, text)
 
 
-async def notify_lobby_closed(bot: Bot, lobby_id: int, reason: str) -> None:
+async def notify_lobby_closed(bot: Bot, lobby_id: int, reason: str, exclude_user_id: int | None = None) -> None:
     with get_session() as session:
         recipients = lobby_member_repo.list_joined_users(session, lobby_id)
 
     text = f"🏁 Лобби закрыто.\n\nПричина: {REASON_TEXTS.get(reason, reason)}"
     keyboard = get_done_reply_keyboard()
     for _member, user in recipients:
+        if exclude_user_id is not None and user.id == exclude_user_id:
+            continue
         await _safe_send(bot, user.telegram_id, text, keyboard)
 
 

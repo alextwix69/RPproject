@@ -55,15 +55,15 @@ def render_create_confirm(state: dict) -> str:
 
 
 def render_lobby_waiting(lobby: Lobby) -> str:
-    code_line = f"\nКод: {lobby.code}\n" if lobby.privacy == "private" else "\n"
     return (
         "🚀 Лобби\n\n"
+        f"Код: {lobby.code}\n"
         f"Тема: {topic_name(lobby.topic)}\n"
         f"Режим: {mode_name(lobby.mode)}\n"
         f"Игроков: {lobby.players_count}/{lobby.max_players}\n"
         f"Тип: {privacy_name(lobby.privacy)}\n"
         f"Статус: {STATUS_NAMES.get(lobby.status, lobby.status)}\n"
-        f"{code_line}\n"
+        "\n"
         "Ожидаем участников..."
     )
 
@@ -71,6 +71,7 @@ def render_lobby_waiting(lobby: Lobby) -> str:
 def render_lobby_info(lobby: Lobby) -> str:
     return (
         "ℹ️ Информация о лобби\n\n"
+        f"Код: {lobby.code}\n"
         f"Тема: {topic_name(lobby.topic)}\n"
         f"Режим: {mode_name(lobby.mode)}\n"
         f"Игроков: {lobby.players_count}/{lobby.max_players}\n"
@@ -82,6 +83,7 @@ def render_lobby_info(lobby: Lobby) -> str:
 def render_active_lobby_started(lobby: Lobby) -> str:
     return (
         "🚀 Лобби активно!\n\n"
+        f"Код: {lobby.code}\n"
         f"Тема: {topic_name(lobby.topic)}\n"
         f"Участников: {lobby.players_count}/{lobby.max_players}\n\n"
         "Теперь пиши сообщения прямо сюда — бот отправит их участникам лобби."
@@ -91,6 +93,7 @@ def render_active_lobby_started(lobby: Lobby) -> str:
 def render_found_lobby(lobby: Lobby) -> str:
     return (
         "🔎 Найдено лобби\n\n"
+        f"Код: {lobby.code}\n"
         f"Тема: {topic_name(lobby.topic)}\n"
         f"Режим: {mode_name(lobby.mode)}\n"
         f"Игроков: {lobby.players_count}/{lobby.max_players}"
@@ -100,6 +103,7 @@ def render_found_lobby(lobby: Lobby) -> str:
 def render_join_role(lobby: Lobby) -> str:
     return (
         "🎭 Выбор роли\n\n"
+        f"Код: {lobby.code}\n"
         f"Тема: {topic_name(lobby.topic)}\n"
         f"Лобби: {lobby.players_count}/{lobby.max_players}\n\n"
         "Выбери свободную роль для входа:"

@@ -6,6 +6,7 @@ from src.keyboards.lobby_keyboard import (
     get_create_role_inline_keyboard,
     get_navigation_reply_keyboard,
     get_play_main_reply_keyboard,
+    get_lobby_waiting_reply_keyboard,
     get_topic_inline_keyboard,
 )
 
@@ -42,11 +43,20 @@ def test_admin_panel_uses_reply_buttons():
     ]
 
 
-def test_active_lobby_reply_keyboard_has_room_controls_without_leave():
+def test_active_lobby_reply_keyboard_has_room_controls_and_exit_button():
     buttons = _reply_texts(get_active_lobby_reply_keyboard())
 
     assert buttons[:2] == ["👥 Участники", "ℹ️ Инфо"]
+    assert "🚪 Выйти" in buttons
     assert "/leave" not in buttons
+
+
+def test_waiting_lobby_keyboard_does_not_show_refresh_button():
+    buttons = _reply_texts(get_lobby_waiting_reply_keyboard(is_owner=True))
+
+    assert "🔄 Обновить" not in buttons
+    assert "▶️ Запустить" not in buttons
+    assert "🚪 Выйти" in buttons
 
 
 def test_choice_reply_keyboard_has_only_navigation_buttons():

@@ -35,7 +35,7 @@ def find_available(
         .where(
             Lobby.topic == topic,
             Lobby.privacy == "public",
-            Lobby.status == "waiting",
+            Lobby.status == "active",
             Lobby.players_count < Lobby.max_players,
         )
         .order_by(Lobby.created_at.asc(), Lobby.id.asc())
@@ -54,6 +54,36 @@ def find_available(
         )
 
     return session.scalar(stmt)
+
+
+def list_available_active(
+    session: Session,
+    topic: str | None = None,
+    user_id: int | None = None,
+) -> list[Lobby]:
+    stmt = (
+        select(Lobby)
+        .where(
+            Lobby.privacy == "public",
+            Lobby.status == "active",
+            Lobby.players_count < Lobby.max_players,
+        )
+        .order_by(Lobby.activated_at.desc(), Lobby.created_at.desc(), Lobby.id.desc())
+    )
+
+    if topic is not None:
+        stmt = stmt.where(Lobby.topic == topic)
+
+    if user_id is not None:
+        stmt = stmt.where(
+            ~exists().where(
+                LobbyMember.lobby_id == Lobby.id,
+                LobbyMember.user_id == user_id,
+                LobbyMember.status == "joined",
+            )
+        )
+
+    return list(session.scalars(stmt).all())
 
 
 def list_expired(session: Session, now: datetime) -> list[Lobby]:

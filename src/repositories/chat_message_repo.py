@@ -71,3 +71,12 @@ def forget_messages(session: Session, message_ids: list[int]) -> None:
         return
 
     session.execute(delete(ChatMessage).where(ChatMessage.id.in_(message_ids)))
+
+
+def forget_message_by_telegram_id(session: Session, chat_id: int, message_id: int) -> None:
+    session.execute(
+        delete(ChatMessage).where(
+            ChatMessage.chat_id == chat_id,
+            ChatMessage.message_id == message_id,
+        )
+    )

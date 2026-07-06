@@ -7,6 +7,7 @@ from src.core.database import get_session
 from src.core.logger import logger
 from src.repositories.chat_message_repo import (
     forget_messages,
+    forget_message_by_telegram_id,
     get_active_screen,
     list_clearable_messages,
     remember_message,
@@ -80,6 +81,28 @@ async def edit_active_screen(update: Update, text: str, reply_markup=None) -> bo
         return False
     except Forbidden:
         return False
+
+
+async def delete_known_message(message: Message | None) -> bool:
+    if message is None or message.chat_id is None or message.message_id is None:
+        return False
+
+    try:
+        await message.delete()
+    except (BadRequest, Forbidden):
+        return False
+    except Exception:
+        logger.exception(
+            "Failed to delete message %s in chat %s",
+            message.message_id,
+            message.chat_id,
+        )
+        return False
+
+    with get_session() as session:
+        forget_message_by_telegram_id(session, message.chat_id, message.message_id)
+        session.commit()
+    return True
 
 
 async def clear_chat(update: Update) -> int:

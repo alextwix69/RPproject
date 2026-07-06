@@ -11,9 +11,9 @@ from src.repositories import lobby_member_repo, lobby_repo
 from src.constants.roles import ROLES_BY_TOPIC
 from src.utils.invite_code import generate_lobby_code
 
-WAITING_TTL = timedelta(minutes=30)
 ACTIVE_TTL = timedelta(hours=2)
-LOBBY_MAX_PLAYERS = 15
+LOBBY_MAX_PLAYERS = 50
+LOBBY_MIN_PLAYERS = 2
 
 
 class LobbyError(Exception):
@@ -31,7 +31,9 @@ def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
 
     mode = "rp"
     _validate_rp_role(lobby=None, topic=payload["topic"], role=payload.get("role"))
-    if LOBBY_MAX_PLAYERS > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
+    max_players = int(payload.get("max_players", LOBBY_MAX_PLAYERS) or LOBBY_MAX_PLAYERS)
+    max_players = min(max(max_players, LOBBY_MIN_PLAYERS), LOBBY_MAX_PLAYERS)
+    if max_players > len(ROLES_BY_TOPIC.get(payload["topic"], {})):
         raise LobbyError("too_many_players", "Для этой темы недостаточно уникальных ролей.")
 
     code = _generate_unique_code(session)
@@ -42,13 +44,14 @@ def create_lobby(session: Session, user: User, payload: dict) -> Lobby:
         topic=payload["topic"],
         mode=mode,
         owner_id=user.id,
-        max_players=LOBBY_MAX_PLAYERS,
+        max_players=max_players,
         players_count=1,
         privacy=payload["privacy"],
-        status="waiting",
+        status="active",
         created_at=now,
         updated_at=now,
-        expires_at=now + WAITING_TTL,
+        activated_at=now,
+        expires_at=now + ACTIVE_TTL,
     )
     lobby_member_repo.create_member(
         session,
@@ -77,8 +80,8 @@ def join_lobby(
         raise LobbyError("not_found", "Лобби с таким кодом не найдено.")
     if lobby.status == "closed":
         raise LobbyError("closed", "Это лобби уже закрыто.")
-    if lobby.status != "waiting":
-        raise LobbyError("not_waiting", "Это лобби уже не ожидает участников.")
+    if lobby.status not in {"waiting", "active"}:
+        raise LobbyError("not_waiting", "Это лобби недоступно для входа.")
     if lobby.players_count >= lobby.max_players:
         raise LobbyError("full", "Это лобби уже заполнено.")
     if lobby.mode == "rp":

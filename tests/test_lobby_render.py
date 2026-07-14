@@ -14,4 +14,4 @@ def test_public_waiting_lobby_shows_code():
         status="waiting",
     )
 
-    assert "Код: ABCD12" in render_lobby_waiting(lobby)
+    assert "🔑 Волшебный код: ABCD12" in render_lobby_waiting(lobby)

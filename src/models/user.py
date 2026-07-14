@@ -37,6 +37,8 @@ class User(Base):
         index=True,
         nullable=True,
     )
+    avatar_file_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    profile_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Служебные поля приложения.
     # role нужен для прав доступа, is_registered показывает прохождение регистрации.

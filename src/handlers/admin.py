@@ -10,7 +10,13 @@ from telegram.ext import (
 )
 
 from src.core.database import get_session
-from src.keyboards.kb_build import BTN_ADMIN_NOTIFY, BTN_ADMIN_RIGHTS, build_admin_panel
+from src.keyboards.kb_build import (
+    BTN_ADMIN_NOTIFY,
+    BTN_ADMIN_RIGHTS,
+    LEGACY_BUTTON_ALIASES,
+    build_admin_panel,
+    normalize_button_text,
+)
 from src.handlers.admin_handlers.users import register_admin_users_handlers
 from src.repositories.user_repo import get_by_telegram_id, get_by_username
 from src.services.admin_service import (
@@ -23,14 +29,14 @@ from src.services.chat_cleanup_service import reply_text
 from src.services.news_notification_service import send_news_notification
 
 ADMIN_MESSAGE = (
-    "Админ-панель\n\n"
-    "Команды для админов из БД:\n"
+    "👑✨ Админ-панель RoleHub\n\n"
+    "📜 Команды хранителей из БД:\n"
     "/users - последние пользователи\n"
     "/user <telegram_id> - карточка пользователя\n"
     "/stats - статистика\n"
     "/export_users - экспорт CSV\n"
     "/notify <текст> - новостная рассылка\n\n"
-    "Команды только для владельцев из OWNER_IDS:\n"
+    "🔐 Команды только для владельцев из OWNER_IDS:\n"
     "/makeadmin <telegram_id|@username> - выдать админские права (только владельцы)\n"
     "/removeadmin <telegram_id|@username> - забрать админские права (только владельцы)"
 )
@@ -55,12 +61,12 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not is_admin_effective_user(update.effective_user):
         return
 
-    text = update.message.text.strip()
+    text = normalize_button_text(update.message.text.strip())
     if text == BTN_ADMIN_NOTIFY:
         await reply_text(
             update.message,
-            "Новостная рассылка\n\n"
-            "Отправь команду:\n"
+            "📣✨ Новостная рассылка\n\n"
+            "Отправь королевскую весточку командой:\n"
             "/notify текст новости",
             reply_markup=build_admin_panel(),
         )
@@ -69,7 +75,7 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if text == BTN_ADMIN_RIGHTS:
         await reply_text(
             update.message,
-            "Права админов\n\n"
+            "👑✨ Права админов\n\n"
             "Доступы:\n"
             "• /admin, /users, /user, /stats, /export_users, /notify — админы из БД\n"
             "• /makeadmin, /removeadmin — только владельцы из OWNER_IDS\n\n"
@@ -81,7 +87,7 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    await reply_text(update.message, "Админ-действие пока не настроено.", reply_markup=build_admin_panel())
+    await reply_text(update.message, "🏗✨ Это действие хранителей пока готовится.", reply_markup=build_admin_panel())
 
 
 async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -185,5 +191,6 @@ def register_admin_handler(application) -> None:
 
 def _admin_filter():
     buttons = {BTN_ADMIN_NOTIFY, BTN_ADMIN_RIGHTS}
+    buttons.update(old for old, new in LEGACY_BUTTON_ALIASES.items() if new in buttons)
     pattern = "^(?:" + "|".join(re.escape(button) for button in buttons) + ")$"
     return filters.TEXT & ~filters.COMMAND & filters.Regex(pattern)

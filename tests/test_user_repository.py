@@ -4,7 +4,12 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.models.base import Base
+from src.models.friendship import Friendship
 from src.models.user import User
+from src.services.profile_service import add_friend
+from src.services.profile_service import find_user_for_friend_search
+from src.services.profile_service import render_profile_text
+from src.services.profile_service import set_avatar_file_id
 from src.services.user_service import DisplayNameError
 from src.services.user_service import ensure_from_effective_user
 from src.services.user_service import set_display_name
@@ -68,6 +73,7 @@ def test_new_effective_user_creates_user():
     assert user.telegram_id == effective_user.id
     assert user.username == "test_user"
     assert user.display_name is None
+    assert user.avatar_file_id is None
 
     session.close()
 
@@ -286,6 +292,49 @@ def test_set_display_name_saves_normalized_unique_name():
 
     assert user.display_name == "Alice Rolehub"
     assert user.is_registered is True
+
+    session.close()
+
+
+def test_profile_avatar_and_render_text_use_user_fields():
+    session = make_session()
+    user = ensure_from_effective_user(session, make_effective_user())
+    set_display_name(session, user, "Alice")
+    set_avatar_file_id(user, "telegram-photo-file-id")
+    session.commit()
+
+    text = render_profile_text(user, is_self=True)
+
+    assert user.avatar_file_id == "telegram-photo-file-id"
+    assert "Твой профиль героя" in text
+    assert "🌟 Имя: Alice" in text
+    assert "🖼 Портрет: сияет в профиле" in text
+    assert "🕰 Последний визит:" in text
+
+    session.close()
+
+
+def test_find_friend_by_display_name_and_create_request():
+    session = make_session()
+    requester = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=1, username="requester"),
+    )
+    target = ensure_from_effective_user(
+        session,
+        make_effective_user(telegram_id=2, username="target"),
+    )
+    set_display_name(session, target, "Target Player")
+    session.commit()
+
+    found = find_user_for_friend_search(session, requester, "target player")
+    friendship = add_friend(session, requester, found)
+    session.commit()
+
+    saved_friendships = session.scalars(select(Friendship)).all()
+    assert found.id == target.id
+    assert friendship.status == "pending"
+    assert len(saved_friendships) == 1
 
     session.close()
 

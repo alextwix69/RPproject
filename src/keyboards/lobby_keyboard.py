@@ -10,35 +10,70 @@ from telegram import (
 from src.constants.roles import ROLE_PAGE_SIZE, ROLES_BY_TOPIC
 from src.constants.topics import TOPIC_BUTTONS
 
-BTN_BACK = "⬅️ Назад"
-BTN_MAIN_MENU = "🏠 Главное меню"
-BTN_CREATE_LOBBY = "➕ Создать лобби"
-BTN_FIND_LOBBY = "🔎 Найти лобби"
-BTN_SEARCH_BY_CODE = "🔑 Поиск лобби по коду"
-BTN_SELECT_TOPIC = "🎯 Выбор темы"
-BTN_PUBLIC = "🌍 Публичное"
-BTN_PRIVATE = "🔒 Приватное"
-BTN_FIND_ROLE = "🔎 Найти роль"
-BTN_RANDOM_ROLE = "🎲 Случайная"
-BTN_RANDOM_FREE_ROLE = "🎲 Случайная свободная"
-BTN_CREATE_CONFIRM = "🚀 Создать лобби"
-BTN_EDIT = "✏️ Изменить"
-BTN_REFRESH = "🔄 Обновить"
-BTN_INVITE = "📨 Пригласить"
-BTN_START = "▶️ Запустить"
-BTN_CLOSE = "🏁 Закрыть"
-BTN_LEAVE = "🚪 Выйти"
-BTN_JOIN = "✅ Войти"
-BTN_NEXT = "🔄 Следующее"
-BTN_MEMBERS = "👥 Участники"
-BTN_INFO = "ℹ️ Инфо"
+BTN_BACK = "↩️ Назад"
+BTN_MAIN_MENU = "🏰 Главное меню"
+BTN_CREATE_LOBBY = "✨ Создать свой мир"
+BTN_FIND_LOBBY = "🔎 Найти мир"
+BTN_SEARCH_BY_CODE = "🔑 Войти по волшебному коду"
+BTN_SELECT_TOPIC = "🌌 Выбрать вселенную"
+BTN_PUBLIC = "🌍 Открытый мир"
+BTN_PRIVATE = "🔒 Тайный мир"
+BTN_FIND_ROLE = "🔎 Найти героя"
+BTN_RANDOM_ROLE = "🎲 Судьба выберет роль"
+BTN_RANDOM_FREE_ROLE = "🎲 Случайная свободная роль"
+BTN_CREATE_CONFIRM = "👑 Открыть мир"
+BTN_EDIT = "✏️ Изменить выбор"
+BTN_REFRESH = "✨ Обновить мир"
+BTN_INVITE = "💌 Позвать героев"
+BTN_START = "🚀 Начать приключение"
+BTN_CLOSE = "🌙 Закрыть мир"
+BTN_LEAVE = "🚪 Покинуть мир"
+BTN_JOIN = "⚔️ Войти в мир"
+BTN_NEXT = "🔮 Следующий мир"
+BTN_MEMBERS = "👥 Герои"
+BTN_INFO = "📜 О мире"
 BTN_SEARCH_AGAIN = "🔄 Искать снова"
-BTN_FIND_ANOTHER = "🔎 Найти другое"
-BTN_CREATE_OWN = "➕ Создать своё"
-BTN_PLAY = "🎮 Играть"
-BTN_SEARCH_MORE = "🔁 Искать ещё"
-BTN_TRY_AGAIN = "🔁 Попробовать ещё"
-BTN_RETURN_TO_LOBBY = "↩️ Вернуться в активное лобби"
+BTN_FIND_ANOTHER = "🔮 Найти другой мир"
+BTN_CREATE_OWN = "✨ Создать свой мир"
+BTN_PLAY = "🌌 Войти в мир"
+BTN_SEARCH_MORE = "🌟 Искать ещё"
+BTN_TRY_AGAIN = "✨ Попробовать снова"
+BTN_RETURN_TO_LOBBY = "↩️ Вернуться в свой мир"
+
+LEGACY_LOBBY_BUTTON_ALIASES = {
+    "⬅️ Назад": BTN_BACK,
+    "🏠 Главное меню": BTN_MAIN_MENU,
+    "➕ Создать лобби": BTN_CREATE_LOBBY,
+    "🔎 Найти лобби": BTN_FIND_LOBBY,
+    "🔑 Поиск лобби по коду": BTN_SEARCH_BY_CODE,
+    "🎯 Выбор темы": BTN_SELECT_TOPIC,
+    "🌍 Публичное": BTN_PUBLIC,
+    "🔒 Приватное": BTN_PRIVATE,
+    "🔎 Найти роль": BTN_FIND_ROLE,
+    "🎲 Случайная": BTN_RANDOM_ROLE,
+    "🎲 Случайная свободная": BTN_RANDOM_FREE_ROLE,
+    "🚀 Создать лобби": BTN_CREATE_CONFIRM,
+    "✏️ Изменить": BTN_EDIT,
+    "🔄 Обновить": BTN_REFRESH,
+    "📨 Пригласить": BTN_INVITE,
+    "▶️ Запустить": BTN_START,
+    "🏁 Закрыть": BTN_CLOSE,
+    "🚪 Выйти": BTN_LEAVE,
+    "✅ Войти": BTN_JOIN,
+    "🔄 Следующее": BTN_NEXT,
+    "👥 Участники": BTN_MEMBERS,
+    "ℹ️ Инфо": BTN_INFO,
+    "🔎 Найти другое": BTN_FIND_ANOTHER,
+    "➕ Создать своё": BTN_CREATE_OWN,
+    "🎮 Играть": BTN_PLAY,
+    "🔁 Искать ещё": BTN_SEARCH_MORE,
+    "🔁 Попробовать ещё": BTN_TRY_AGAIN,
+    "↩️ Вернуться в активное лобби": BTN_RETURN_TO_LOBBY,
+}
+
+
+def normalize_lobby_button_text(text: str) -> str:
+    return LEGACY_LOBBY_BUTTON_ALIASES.get(text, text)
 
 CB_TOPIC_PREFIX = "lobby:topic:"
 CB_CREATE_ROLE_PREFIX = "lobby:create_role:"
@@ -59,7 +94,7 @@ def _reply(rows: list[list[str]]) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         rows,
         resize_keyboard=True,
-        input_field_placeholder="Выбери действие",
+        input_field_placeholder="Выбери свой путь ✨",
     )
 
 

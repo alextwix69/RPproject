@@ -7,7 +7,7 @@ from src.repositories.user_repo import get_by_telegram_id, set_role_by_telegram_
 
 
 def is_owner_telegram_id(telegram_id: int | None) -> bool:
-    """Проверяет владельца по OWNER_IDS из .env."""
+    """Проверяет владельца по OWNER_IDS или legacy ADMIN_IDS из .env."""
 
     return telegram_id is not None and telegram_id in get_owner_ids()
 
@@ -19,10 +19,12 @@ def is_owner_effective_user(effective_user) -> bool:
 
 
 def is_admin_telegram_id(telegram_id: int | None) -> bool:
-    """Проверяет админские права только по роли пользователя в БД."""
+    """Проверяет админские права по owner-list или роли пользователя в БД."""
 
     if telegram_id is None:
         return False
+    if is_owner_telegram_id(telegram_id):
+        return True
 
     with get_session() as session:
         user = get_by_telegram_id(session, telegram_id)

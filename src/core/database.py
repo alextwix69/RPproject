@@ -16,6 +16,7 @@ from src.models.base import Base
 from src.models import lobby as _lobby_models  # noqa: F401
 from src.models import user as _user_models  # noqa: F401
 from src.models import chat_message as _chat_message_models  # noqa: F401
+from src.models import friendship as _friendship_models  # noqa: F401
 
 db_url = get_database_url()
 engine = create_engine(db_url)
@@ -62,6 +63,10 @@ def _ensure_runtime_columns() -> None:
         statements.append(
             "ALTER TABLE users ADD COLUMN news_notifications_enabled BOOLEAN DEFAULT 1"
         )
+    if "avatar_file_id" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN avatar_file_id VARCHAR(255)")
+    if "profile_data" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN profile_data JSON")
 
     chat_columns = set()
     if "chat_messages" in inspector.get_table_names():

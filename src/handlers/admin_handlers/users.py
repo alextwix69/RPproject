@@ -11,8 +11,14 @@ from telegram import InputFile, Update
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 
 from src.core.database import get_session
-from src.keyboards.kb_build import BTN_ADMIN_EXPORT, BTN_ADMIN_STATS, BTN_ADMIN_USERS
-from src.keyboards.kb_build import build_admin_panel
+from src.keyboards.kb_build import (
+    BTN_ADMIN_EXPORT,
+    BTN_ADMIN_STATS,
+    BTN_ADMIN_USERS,
+    LEGACY_BUTTON_ALIASES,
+    build_admin_panel,
+    normalize_button_text,
+)
 from src.models.user import User
 from src.services.admin_service import is_admin_effective_user
 from src.services.chat_cleanup_service import remember_telegram_message, reply_text
@@ -105,7 +111,7 @@ def _users_text(limit: int = 10) -> str:
     if not users:
         return "В базе пока нет пользователей."
 
-    parts = ["Последние пользователи:\n"]
+    parts = ["👥✨ Последние герои RoleHub:\n"]
     parts.extend(_format_user_short(user, index) for index, user in enumerate(users, 1))
     return "\n\n".join(parts)
 
@@ -115,7 +121,7 @@ def _stats_text() -> str:
         stats = get_users_stats(session)
 
     return (
-        "Статистика пользователей\n\n"
+        "📊✨ Статистика королевства RoleHub\n\n"
         f"Всего в базе: {stats['total']}\n"
         f"Боты: {stats['bots']}\n"
         f"Активны сегодня: {stats['active_today']}\n"
@@ -241,7 +247,7 @@ async def export_users_command(update: Update, context: ContextTypes.DEFAULT_TYP
     if update.message is not None:
         sent_message = await update.message.reply_document(
             document=_users_csv_file(),
-            caption="Экспорт пользователей из БД",
+            caption="📜 Экспорт героев RoleHub из БД",
         )
         remember_telegram_message(sent_message)
 
@@ -254,7 +260,7 @@ async def admin_users_reply_handler(update: Update, context: ContextTypes.DEFAUL
         await _deny(update)
         return
 
-    text = update.message.text.strip()
+    text = normalize_button_text(update.message.text.strip())
     if text == BTN_ADMIN_USERS:
         await reply_text(update.message, _users_text(), reply_markup=build_admin_panel())
         return
@@ -266,13 +272,14 @@ async def admin_users_reply_handler(update: Update, context: ContextTypes.DEFAUL
     if text == BTN_ADMIN_EXPORT:
         sent_message = await update.message.reply_document(
             document=_users_csv_file(),
-            caption="Экспорт пользователей из БД",
+            caption="📜 Экспорт героев RoleHub из БД",
         )
         remember_telegram_message(sent_message)
 
 
 def _admin_users_filter():
     buttons = {BTN_ADMIN_USERS, BTN_ADMIN_STATS, BTN_ADMIN_EXPORT}
+    buttons.update(old for old, new in LEGACY_BUTTON_ALIASES.items() if new in buttons)
     pattern = "^(?:" + "|".join(re.escape(button) for button in buttons) + ")$"
     return filters.TEXT & ~filters.COMMAND & filters.Regex(pattern)
 

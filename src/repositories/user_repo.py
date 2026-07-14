@@ -29,7 +29,11 @@ def get_by_telegram_id(session: Session, telegram_id: int) -> User | None:
 def get_by_display_name(session: Session, display_name: str) -> User | None:
     """Ищет пользователя по имени профиля без учета регистра."""
 
-    stmt = select(User).where(func.lower(User.display_name) == display_name.lower())
+    normalized_name = display_name.strip()
+    if not normalized_name:
+        return None
+
+    stmt = select(User).where(func.lower(User.display_name) == normalized_name.lower())
     return session.scalar(stmt)
 
 
@@ -47,6 +51,20 @@ def get_by_username(session: Session, username: str) -> User | None:
 def get_by_id(session: Session, user_id: int) -> User | None:
     stmt = select(User).where(User.id == user_id)
     return session.scalar(stmt)
+
+
+def find_by_nickname(session: Session, nickname: str) -> User | None:
+    """Ищет пользователя по RoleHub display_name или Telegram username."""
+
+    normalized = nickname.strip()
+    if not normalized:
+        return None
+
+    by_display_name = get_by_display_name(session, normalized)
+    if by_display_name is not None:
+        return by_display_name
+
+    return get_by_username(session, normalized)
 
 
 def list_users(session: Session, limit: int = 10, offset: int = 0) -> list[User]:
@@ -183,6 +201,8 @@ def update_from_effective_user(user: User, effective_user) -> User:
     user.is_bot = effective_user.is_bot
     if user.news_notifications_enabled is None:
         user.news_notifications_enabled = True
+    if user.profile_data is None:
+        user.profile_data = {}
     user.last_seen_at = datetime.utcnow()
 
     # Важно: is_registered здесь не меняем.

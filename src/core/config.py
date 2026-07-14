@@ -29,10 +29,18 @@ def get_database_url() -> str:
         raise RuntimeError("db_url не получен")
     return db_url
 
-def get_owner_ids() -> list[int]:
-    owner_ids = [
-        int(x)
-        for x in os.getenv("OWNER_IDS", "").split(",")
-        if x
+def _parse_id_list(raw_value: str) -> list[int]:
+    return [
+        int(x.strip())
+        for x in raw_value.split(",")
+        if x.strip()
     ]
-    return owner_ids
+
+
+def get_owner_ids() -> list[int]:
+    owner_ids = os.getenv("OWNER_IDS")
+    if owner_ids:
+        return _parse_id_list(owner_ids)
+
+    legacy_admin_ids = os.getenv("ADMIN_IDS", "")
+    return _parse_id_list(legacy_admin_ids)

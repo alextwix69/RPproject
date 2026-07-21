@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+from contextlib import suppress
 from datetime import datetime
 
 from telegram import Update
@@ -1006,16 +1007,38 @@ async def start_lobby_background_tasks(application) -> None:
     job_queue = getattr(application, "_job_queue", None)
     if job_queue is not None:
         return
-    if application.bot_data.get("lobby_expiration_task_started"):
+
+    existing_task = application.bot_data.get("lobby_expiration_task")
+    if existing_task is not None and not existing_task.done():
         return
-    application.bot_data["lobby_expiration_task_started"] = True
-    application.create_task(_expiration_loop(application), name="rolehub-lobby-expiration")
+
+    # post_init runs before Application.start(), so Application.create_task()
+    # would emit PTBUserWarning and would not be awaited by Application.stop().
+    application.bot_data["lobby_expiration_task"] = asyncio.create_task(
+        _expiration_loop(application),
+        name="rolehub-lobby-expiration",
+    )
+
+
+async def stop_lobby_background_tasks(application) -> None:
+    task = application.bot_data.pop("lobby_expiration_task", None)
+    if task is None:
+        return
+
+    task.cancel()
+    with suppress(asyncio.CancelledError):
+        await task
 
 
 async def _expiration_loop(application) -> None:
     while True:
         await asyncio.sleep(60)
-        await close_expired_lobbies_for_bot(application.bot)
+        try:
+            await close_expired_lobbies_for_bot(application.bot)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Lobby expiration background task failed")
 
 
 def register_lobby_message_handler(application) -> None:

@@ -16,7 +16,11 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters
 from src.handlers.start import register_start_handler
 from src.handlers.admin import register_admin_handler 
 from src.handlers.main_menu import register_main_menu_handler
-from src.handlers.play_lobby import register_lobby_message_handler, start_lobby_background_tasks
+from src.handlers.play_lobby import (
+    register_lobby_message_handler,
+    start_lobby_background_tasks,
+    stop_lobby_background_tasks,
+)
 from src.services.chat_cleanup_service import track_incoming_message
 
 # Создание приложения бота
@@ -28,6 +32,8 @@ def build_application():
         ApplicationBuilder()
         .token(API_KEY)
         .post_init(start_lobby_background_tasks)
+        .post_stop(stop_lobby_background_tasks)
+        .post_shutdown(stop_lobby_background_tasks)
         .build()
     )
 
